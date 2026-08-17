@@ -58,18 +58,31 @@ public:
         evaluateRange("phosphorus", profile.phosphorus, snapshot.phosphorus, result);
         evaluateRange("potassium", profile.potassium, snapshot.potassium, result);
 
+        bool hasSoilPriorityCommand = false;
         if (snapshot.soilHumidity < profile.soilHumidity.min)
         {
-            addCommand(result, IRRIGATION_RELAY_INDEX, true);
+            if (relayStates[IRRIGATION_RELAY_INDEX] == false)
+            {
+                addCommand(result, IRRIGATION_RELAY_INDEX, true);
+            }
+            hasSoilPriorityCommand = true;
         }
         else if (snapshot.soilHumidity > profile.soilHumidity.max)
         {
-            addCommand(result, IRRIGATION_RELAY_INDEX, false);
+            if (relayStates[IRRIGATION_RELAY_INDEX] == true)
+            {
+                addCommand(result, IRRIGATION_RELAY_INDEX, false);
+            }
+            hasSoilPriorityCommand = true;
         }
 
         for (size_t i = 0; i < profile.relayRuleCount; ++i)
         {
             const RelayRule &rule = profile.relayRules[i];
+            if (hasSoilPriorityCommand && rule.relayIndex == IRRIGATION_RELAY_INDEX)
+            {
+                continue;
+            }
             const uint32_t cycle = rule.onDurationMs + rule.offDurationMs;
             if (cycle == 0)
             {

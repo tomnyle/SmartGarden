@@ -15,7 +15,7 @@
 #endif
 
 #ifndef SMARTGARDEN_WIFI_PASSWORD
-#define SMARTGARDEN_WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define SMARTGARDEN_WIFI_PASSWORD ""
 #endif
 
 #ifndef SMARTGARDEN_MQTT_HOST
@@ -44,14 +44,7 @@ constexpr size_t MAX_ALERT_MESSAGES = 8;
 constexpr size_t DATA_LOG_CAPACITY = 32;
 
 constexpr uint8_t IRRIGATION_RELAY_INDEX = 0;
+constexpr uint32_t DEFAULT_IRRIGATION_OFF_DURATION_MS = 300000UL;
 
 constexpr unsigned long SENSOR_UPDATE_MS = 5000UL;
 constexpr unsigned long DASHBOARD_UPDATE_MS = 5000UL;
-
-inline String mqttTopic(const char *suffix)
-{
-    String topic = SMARTGARDEN_MQTT_ROOT_TOPIC;
-    topic += "/";
-    topic += suffix;
-    return topic;
-}

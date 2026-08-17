@@ -208,9 +208,16 @@ public:
         {
             activeIndex_ = -1;
         }
-        else if (activeIndex_ >= static_cast<int8_t>(count_))
+        else if (activeIndex_ == static_cast<int8_t>(index))
         {
-            activeIndex_ = static_cast<int8_t>(count_ - 1);
+            if (activeIndex_ >= static_cast<int8_t>(count_))
+            {
+                activeIndex_ = static_cast<int8_t>(count_ - 1);
+            }
+        }
+        else if (activeIndex_ > static_cast<int8_t>(index))
+        {
+            --activeIndex_;
         }
 
         return true;
