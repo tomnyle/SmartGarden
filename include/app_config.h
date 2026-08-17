@@ -1,31 +1,13 @@
 #pragma once
 
-// ========================================
-// Smart Garden Configuration
-// ========================================
+#include "config.h"
 
-#define DEVICE_NAME "SmartGarden"
-#define DEVICE_ID   "smartgarden_01"
-
-// WiFi
-#define WIFI_SSID     "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
-
-// MQTT
-#define MQTT_HOST     "192.168.1.100"
-#define MQTT_PORT     1883
-
-#define MQTT_USERNAME ""
-#define MQTT_PASSWORD ""
-
-#define MQTT_ROOT_TOPIC "smartgarden"
-
-// Garden
-#define ZONE_COUNT 8
-
-// Sensor
-#define SENSOR_UPDATE_MS 5000
-
-// RS485
-#define RS485_BAUDRATE 4800
-#define SOIL_SENSOR_ID 1
+#define DEVICE_NAME SMARTGARDEN_DEVICE_NAME
+#define DEVICE_ID SMARTGARDEN_DEVICE_ID
+#define WIFI_SSID SMARTGARDEN_WIFI_SSID
+#define WIFI_PASSWORD SMARTGARDEN_WIFI_PASSWORD
+#define MQTT_HOST SMARTGARDEN_MQTT_HOST
+#define MQTT_PORT SMARTGARDEN_MQTT_PORT
+#define MQTT_USERNAME SMARTGARDEN_MQTT_USERNAME
+#define MQTT_PASSWORD SMARTGARDEN_MQTT_PASSWORD
+#define MQTT_ROOT_TOPIC SMARTGARDEN_MQTT_ROOT_TOPIC
