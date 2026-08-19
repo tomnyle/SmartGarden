@@ -1,12 +1,13 @@
 #pragma once
 
 #include <Arduino.h>
+#include "pins.h"
 
 class RelayManager
 {
 private:
-    static const int RELAY_COUNT = 8;
-    bool relayState[RELAY_COUNT] = {false};
+    static constexpr int kRelayCount = RELAY_COUNT;
+    bool relayState[kRelayCount] = {false};
 
     struct PendingCommand
     {
@@ -15,7 +16,7 @@ private:
         bool active;
     };
 
-    PendingCommand pendingCommands[RELAY_COUNT] = {};
+    PendingCommand pendingCommands[kRelayCount] = {};
 
 public:
     RelayManager() = default;

@@ -19,7 +19,7 @@
 // ---------- Relay ----------
 #define RELAY_COUNT         8
 
-static const uint8_t RELAY_PINS[RELAY_COUNT] = {
+static constexpr uint8_t RELAY_PINS[RELAY_COUNT] = {
     5, 18, 19, 27, 32, 33, 25, 26
 };
 

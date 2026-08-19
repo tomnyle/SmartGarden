@@ -12,7 +12,7 @@ bool relayWriteLevel(bool enabled)
 
 void RelayManager::begin()
 {
-    for (int i = 0; i < RELAY_COUNT; ++i)
+    for (int i = 0; i < kRelayCount; ++i)
     {
         pinMode(RELAY_PINS[i], OUTPUT);
         digitalWrite(RELAY_PINS[i], relayWriteLevel(false));
@@ -25,7 +25,7 @@ void RelayManager::begin()
 
 void RelayManager::setRelay(int index, bool state)
 {
-    if (index < 0 || index >= RELAY_COUNT)
+    if (index < 0 || index >= kRelayCount)
     {
         return;
     }
@@ -41,7 +41,7 @@ void RelayManager::setRelay(int index, bool state)
 
 bool RelayManager::getRelayState(int index) const
 {
-    if (index < 0 || index >= RELAY_COUNT)
+    if (index < 0 || index >= kRelayCount)
     {
         return false;
     }
@@ -51,7 +51,7 @@ bool RelayManager::getRelayState(int index) const
 
 void RelayManager::queueCommand(uint8_t index, bool state)
 {
-    if (index >= RELAY_COUNT)
+    if (index >= kRelayCount)
     {
         return;
     }
@@ -63,7 +63,7 @@ void RelayManager::queueCommand(uint8_t index, bool state)
 
 void RelayManager::applyQueuedCommands()
 {
-    for (int i = 0; i < RELAY_COUNT; ++i)
+    for (int i = 0; i < kRelayCount; ++i)
     {
         if (!pendingCommands[i].active)
         {
@@ -77,7 +77,7 @@ void RelayManager::applyQueuedCommands()
 
 void RelayManager::allOff()
 {
-    for (int i = 0; i < RELAY_COUNT; ++i)
+    for (int i = 0; i < kRelayCount; ++i)
     {
         setRelay(i, false);
         pendingCommands[i].active = false;
@@ -87,7 +87,7 @@ void RelayManager::allOff()
 void RelayManager::printRelayStatus() const
 {
     Serial.println("\n===== RELAY STATUS =====");
-    for (int i = 0; i < RELAY_COUNT; ++i)
+    for (int i = 0; i < kRelayCount; ++i)
     {
         Serial.printf("Relay %d: %s\n", i + 1, relayState[i] ? "ON" : "OFF");
     }
@@ -96,5 +96,5 @@ void RelayManager::printRelayStatus() const
 
 int RelayManager::getRelayCount() const
 {
-    return RELAY_COUNT;
+    return kRelayCount;
 }

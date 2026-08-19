@@ -2,7 +2,6 @@
 
 #include "config.h"
 #include "relay_manager.h"
-#include "sensor_manager.h"
 
 MqttHandler *MqttHandler::activeInstance = nullptr;
 
@@ -13,13 +12,11 @@ MqttHandler::MqttHandler()
 
 void MqttHandler::begin(RelayManager &relayManagerRef,
                         ClimateManager &climateManagerRef,
-                        CropProfileStore &cropStoreRef,
-                        SensorManager &sensorManagerRef)
+                        CropProfileStore &cropStoreRef)
 {
     relayManager = &relayManagerRef;
     climateManager = &climateManagerRef;
     cropStore = &cropStoreRef;
-    sensorManager = &sensorManagerRef;
     activeInstance = this;
 
     mqttClient.setServer(SMARTGARDEN_MQTT_HOST, SMARTGARDEN_MQTT_PORT);
@@ -78,11 +75,17 @@ void MqttHandler::publishCropList()
     String payload;
     for (size_t i = 0; i < cropStore->getCount(); ++i)
     {
+        const CropProfile *profile = cropStore->getProfile(i);
+        if (profile == nullptr)
+        {
+            continue;
+        }
+
         if (i > 0)
         {
             payload += ",";
         }
-        payload += cropStore->getProfile(i).key;
+        payload += profile->key;
     }
 
     publishTopic("crop/list", payload);
@@ -185,6 +188,7 @@ void MqttHandler::ensureConnected()
     {
         Serial.println("...connected");
         subscribeTopics();
+        publishTopic("device/name", SMARTGARDEN_DEVICE_NAME);
         publishCropList();
         publishCurrentCropConfig();
         publishRelayStates();
@@ -198,7 +202,6 @@ void MqttHandler::ensureConnected()
 
 void MqttHandler::subscribeTopics()
 {
-    publishTopic("device/name", SMARTGARDEN_DEVICE_NAME);
     mqttClient.subscribe((String(SMARTGARDEN_MQTT_ROOT_TOPIC) + "/crop/set").c_str());
     mqttClient.subscribe((String(SMARTGARDEN_MQTT_ROOT_TOPIC) + "/autocontrol/set").c_str());
 

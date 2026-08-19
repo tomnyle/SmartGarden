@@ -41,7 +41,6 @@ void setup()
     Serial.println("      SMART GARDEN");
     Serial.println("==============================");
 
-    cropStore.loadDefaults();
     if (!cropStore.load())
     {
         cropStore.save();
@@ -50,7 +49,7 @@ void setup()
     relayManager.begin();
     climateManager.begin(relayManager);
     sensorManager.begin();
-    mqttHandler.begin(relayManager, climateManager, cropStore, sensorManager);
+    mqttHandler.begin(relayManager, climateManager, cropStore);
 
     Serial.println("SmartGarden initialized");
 }

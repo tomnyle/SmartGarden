@@ -8,7 +8,6 @@
 #include "crop_profiles.h"
 
 class RelayManager;
-class SensorManager;
 
 class MqttHandler
 {
@@ -17,8 +16,7 @@ public:
 
     void begin(RelayManager &relayManager,
                ClimateManager &climateManager,
-               CropProfileStore &cropStore,
-               SensorManager &sensorManager);
+               CropProfileStore &cropStore);
     void loop();
     bool isConnected() const;
 
@@ -31,7 +29,6 @@ private:
     RelayManager *relayManager = nullptr;
     ClimateManager *climateManager = nullptr;
     CropProfileStore *cropStore = nullptr;
-    SensorManager *sensorManager = nullptr;
     WiFiClient wifiClient;
     PubSubClient mqttClient;
     unsigned long lastReconnectAttempt = 0;

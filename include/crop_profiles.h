@@ -141,9 +141,14 @@ public:
         return &profiles[activeIndex];
     }
 
-    const CropProfile &getProfile(size_t index) const
+    const CropProfile *getProfile(size_t index) const
     {
-        return profiles[index];
+        if (index >= profileCount)
+        {
+            return nullptr;
+        }
+
+        return &profiles[index];
     }
 
     size_t getCount() const
