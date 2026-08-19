@@ -43,7 +43,7 @@ public:
         evaluateRange("temperature", profile.temperature, snapshot.airTemp, result);
         evaluateRange("airHumidity", profile.airHumidity, snapshot.airHumidity, result);
         evaluateRange("ph", profile.ph, snapshot.ph, result);
-        evaluateRange("ec", profile.ec, (float)snapshot.ec, result);
+        evaluateRange("ec", profile.ec, snapshot.ec / 1000.0f, result);
         evaluateRange("nitrogen", profile.nitrogen, (float)snapshot.nitrogen, result);
         evaluateRange("phosphorus", profile.phosphorus, (float)snapshot.phosphorus, result);
         evaluateRange("potassium", profile.potassium, (float)snapshot.potassium, result);
