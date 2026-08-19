@@ -209,6 +209,7 @@ void setup()
 
     // Setup MQTT
     client.setServer(SMARTGARDEN_MQTT_HOST, SMARTGARDEN_MQTT_PORT);
+    client.setBufferSize(768);
     client.setCallback(callback);
     reconnect();
 
