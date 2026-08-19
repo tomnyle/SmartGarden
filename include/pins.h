@@ -1,27 +1,36 @@
-#pragma once
+#ifndef PINS_H
+#define PINS_H
 
-// ========================================
-// Smart Garden - Pin Configuration
-// ========================================
+// DHT22 Sensor Pin
+#define DHT_PIN 4
+#define DHT_TYPE DHT22
 
-// ---------- RS485 / MAX485 ----------
-#define PIN_RS485_RX       16
-#define PIN_RS485_TX       17
-#define PIN_RS485_RE_DE     4
+// RS485 Communication Pins (Serial2)
+#define RS485_RX 16
+#define RS485_TX 17
+#define RS485_DE 18  // Direction Enable pin
 
-// ---------- I2C ----------
-#define PIN_I2C_SDA        21
-#define PIN_I2C_SCL        22
+// Relay Control Pins (8 relays)
+#define RELAY_1_PIN 32
+#define RELAY_2_PIN 33
+#define RELAY_3_PIN 25
+#define RELAY_4_PIN 26
+#define RELAY_5_PIN 27
+#define RELAY_6_PIN 14
+#define RELAY_7_PIN 12
+#define RELAY_8_PIN 13
 
-// ---------- Relay ----------
-#define RELAY_COUNT         8
-
-static const uint8_t RELAY_PINS[RELAY_COUNT] = {
-    5, 18, 19, 21, 22, 23, 25, 26
+// Relay array
+const uint8_t RELAY_PINS[8] = {
+    RELAY_1_PIN, RELAY_2_PIN, RELAY_3_PIN, RELAY_4_PIN,
+    RELAY_5_PIN, RELAY_6_PIN, RELAY_7_PIN, RELAY_8_PIN
 };
 
-// Relay module active LOW
-#define RELAY_ACTIVE_LOW    true
+// Serial pins (for debugging)
+#define SERIAL_RX 3
+#define SERIAL_TX 1  // GPIO1 on ESP32
 
-// ---------- Status LED ----------
-#define PIN_STATUS_LED       2
+// Status LED (optional)
+#define STATUS_LED_PIN 2
+
+#endif // PINS_H
