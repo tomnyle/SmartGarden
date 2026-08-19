@@ -8,6 +8,10 @@
 extern PubSubClient client;
 extern CropProfileStore cropStore;
 
+#define SMARTGARDEN_TOPIC_CROP_LIST SMARTGARDEN_MQTT_ROOT_TOPIC "/crop/list"
+#define SMARTGARDEN_TOPIC_CROP_CURRENT SMARTGARDEN_MQTT_ROOT_TOPIC "/crop/current"
+#define SMARTGARDEN_TOPIC_CROP_CONFIG SMARTGARDEN_MQTT_ROOT_TOPIC "/crop/config"
+
 inline void publishCropList()
 {
     String payload;
@@ -26,7 +30,7 @@ inline void publishCropList()
         payload += profile->name;
     }
 
-    client.publish("smartgarden/crop/list", payload.c_str(), true);
+    client.publish(SMARTGARDEN_TOPIC_CROP_LIST, payload.c_str(), true);
 }
 
 inline void publishCurrentCropConfig()
@@ -37,7 +41,7 @@ inline void publishCurrentCropConfig()
         return;
     }
 
-    client.publish("smartgarden/crop/current", profile->name, true);
+    client.publish(SMARTGARDEN_TOPIC_CROP_CURRENT, profile->name, true);
 
     String payload = "{";
     payload += "\"name\":\"" + String(profile->name) + "\",";
@@ -53,5 +57,5 @@ inline void publishCurrentCropConfig()
     payload += "\"potassium\":{\"min\":" + String(profile->potassium.min, 0) + ",\"max\":" + String(profile->potassium.max, 0) + "}";
     payload += "}";
 
-    client.publish("smartgarden/crop/config", payload.c_str(), true);
+    client.publish(SMARTGARDEN_TOPIC_CROP_CONFIG, payload.c_str(), true);
 }

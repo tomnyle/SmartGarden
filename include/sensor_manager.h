@@ -37,6 +37,9 @@ public:
         digitalWrite(_directionPin, LOW);
         _rs485Serial.begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
         _modbusNode.begin(_slaveId, _rs485Serial);
+        activeDirectionPin() = _directionPin;
+        _modbusNode.preTransmission(preTransmission);
+        _modbusNode.postTransmission(postTransmission);
     }
 
     bool read(SensorSnapshot &snapshot)
@@ -46,9 +49,9 @@ public:
         snapshot.airHumidity = _dht.readHumidity();
         snapshot.timestamp = millis();
 
-        digitalWrite(_directionPin, HIGH);
-        uint8_t result = _modbusNode.readHoldingRegisters(0x0000, 40);
-        digitalWrite(_directionPin, LOW);
+        activeInstance() = this;
+        uint8_t result = _modbusNode.readHoldingRegisters(0x0000, 10);
+        activeInstance() = nullptr;
 
         if (result == _modbusNode.ku8MBSuccess)
         {
@@ -71,6 +74,30 @@ public:
     }
 
 private:
+    static SensorManager *&activeInstance()
+    {
+        static SensorManager *instance = nullptr;
+        return instance;
+    }
+
+    static void preTransmission()
+    {
+        SensorManager *instance = activeInstance();
+        if (instance != nullptr)
+        {
+            digitalWrite(instance->_directionPin, HIGH);
+        }
+    }
+
+    static void postTransmission()
+    {
+        SensorManager *instance = activeInstance();
+        if (instance != nullptr)
+        {
+            digitalWrite(instance->_directionPin, LOW);
+        }
+    }
+
     DHT _dht;
     HardwareSerial &_rs485Serial;
     ModbusMaster &_modbusNode;

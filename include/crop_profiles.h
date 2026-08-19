@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
-#include <strings.h>
+#include <string.h>
 
 #include "config.h"
 
@@ -40,6 +40,8 @@ struct CropProfile
     RelayRule relayRules[SMARTGARDEN_RELAY_COUNT];
     size_t relayRuleCount;
 };
+
+static_assert(SMARTGARDEN_RELAY_COUNT >= 3, "SmartGarden requires at least 3 relays for irrigation, fan, and light rules.");
 
 static const uint8_t IRRIGATION_RELAY_INDEX = 0;
 static const uint8_t CLIMATE_FAN_RELAY_INDEX = 1;
