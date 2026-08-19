@@ -55,6 +55,9 @@ private:
 
     int _relayCount;
 
+    unsigned long _lastReconnectAttempt;
+    static const unsigned long RECONNECT_INTERVAL_MS = 5000;
+
     static void _internalCallback(char *topic, uint8_t *payload, unsigned int length);
     static MqttService *_instance;
     MessageCallback _userCallback;

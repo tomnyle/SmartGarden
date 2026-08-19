@@ -5,7 +5,7 @@ MqttService *MqttService::_instance = nullptr;
 MqttService::MqttService(const char *host, uint16_t port,
                          const char *username, const char *password,
                          const char *clientId)
-    : _port(port), _relayCount(8), _userCallback(nullptr)
+    : _port(port), _relayCount(8), _userCallback(nullptr), _lastReconnectAttempt(0)
 {
     strncpy(_host,     host,     sizeof(_host) - 1);
     strncpy(_username, username, sizeof(_username) - 1);
@@ -128,7 +128,14 @@ void MqttService::setCallback(MessageCallback cb)
 void MqttService::loop()
 {
     if (!_client.connected())
-        connect();
+    {
+        unsigned long now = millis();
+        if (now - _lastReconnectAttempt >= RECONNECT_INTERVAL_MS)
+        {
+            _lastReconnectAttempt = now;
+            connect();
+        }
+    }
     _client.loop();
 }
 

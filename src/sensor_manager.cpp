@@ -1,7 +1,7 @@
 #include "sensor_manager.h"
 
-// Static pointers used in pre/post-transmission callbacks
-static SensorManager *_sensorManagerInstance = nullptr;
+// Defined here; set in begin() – safe for single-instance firmware
+SensorManager *SensorManager::_instance = nullptr;
 
 SensorManager::SensorManager(uint8_t dhtPin, uint8_t rs485Rx, uint8_t rs485Tx, uint8_t rs485De)
     : _dht(dhtPin, DHT22),
@@ -13,11 +13,12 @@ SensorManager::SensorManager(uint8_t dhtPin, uint8_t rs485Rx, uint8_t rs485Tx, u
       _rs485Valid(false)
 {
     memset(&_snapshot, 0, sizeof(_snapshot));
-    _sensorManagerInstance = this;
 }
 
 void SensorManager::begin()
 {
+    _instance = this;
+
     _dht.begin();
     Serial.println("[SensorManager] DHT22 initialised");
 
@@ -26,27 +27,22 @@ void SensorManager::begin()
 
     _rs485Serial.begin(RS485_BAUDRATE, SERIAL_8N1, _rs485Rx, _rs485Tx);
     _node.begin(SOIL_SENSOR_ID, _rs485Serial);
-
-    _node.preTransmission([]() {
-        if (_sensorManagerInstance)
-            _sensorManagerInstance->preTransmission();
-    });
-    _node.postTransmission([]() {
-        if (_sensorManagerInstance)
-            _sensorManagerInstance->postTransmission();
-    });
+    _node.preTransmission(preTransmissionCb);
+    _node.postTransmission(postTransmissionCb);
 
     Serial.println("[SensorManager] RS485 Modbus initialised");
 }
 
-void SensorManager::preTransmission()
+void SensorManager::preTransmissionCb()
 {
-    digitalWrite(_rs485De, HIGH);
+    if (_instance)
+        digitalWrite(_instance->_rs485De, HIGH);
 }
 
-void SensorManager::postTransmission()
+void SensorManager::postTransmissionCb()
 {
-    digitalWrite(_rs485De, LOW);
+    if (_instance)
+        digitalWrite(_instance->_rs485De, LOW);
 }
 
 void SensorManager::readSensors()

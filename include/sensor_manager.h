@@ -43,6 +43,9 @@ private:
     bool           _dhtValid;
     bool           _rs485Valid;
 
-    void preTransmission();
-    void postTransmission();
+    // Static callbacks required by ModbusMaster (non-capturing function pointers).
+    // _instance is set in begin() and is safe for single-instance firmware use.
+    static SensorManager *_instance;
+    static void preTransmissionCb();
+    static void postTransmissionCb();
 };
