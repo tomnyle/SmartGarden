@@ -112,7 +112,7 @@ bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
     snprintf(payload, sizeof(payload), "%.2f", snapshot.soilMoisture);
     ok &= publish("smartgarden/sensors/soil_moisture", payload);
 
-    snprintf(payload, sizeof(payload), "%lu", snapshot.timestamp);
+    snprintf(payload, sizeof(payload), "%lu", static_cast<unsigned long>(snapshot.timestamp));
     ok &= publish("smartgarden/sensors/timestamp", payload);
 
     return ok;
@@ -137,7 +137,7 @@ bool MQTTService::publishCropList()
     char payload[1024];
     size_t offset = 0;
     offset += snprintf(payload + offset, sizeof(payload) - offset, "[");
-    for (uint8_t i = 0; i < count && offset < sizeof(payload); ++i)
+    for (uint8_t i = 0; i < count && (offset + 2) < sizeof(payload); ++i)
     {
         offset += snprintf(payload + offset, sizeof(payload) - offset,
                            "%s\"%s\"", (i == 0) ? "" : ",", crops[i].name);
@@ -171,11 +171,22 @@ bool MQTTService::publishDiscoverySensor(const char* objectId, const char* name,
     char topic[160];
     char payload[512];
     snprintf(topic, sizeof(topic), "homeassistant/sensor/%s/%s/config", deviceId, objectId);
-    snprintf(payload, sizeof(payload),
-             "{\"name\":\"%s\",\"unique_id\":\"%s_%s\",\"state_topic\":\"%s\","
-             "\"unit_of_measurement\":\"%s\",\"device_class\":\"%s\","
-             "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"SmartGarden\"}}",
-             name, deviceId, objectId, stateTopic, unit, deviceClass, deviceId);
+    if (deviceClass != nullptr && deviceClass[0] != '\0')
+    {
+        snprintf(payload, sizeof(payload),
+                 "{\"name\":\"%s\",\"unique_id\":\"%s_%s\",\"state_topic\":\"%s\","
+                 "\"unit_of_measurement\":\"%s\",\"device_class\":\"%s\","
+                 "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"SmartGarden\"}}",
+                 name, deviceId, objectId, stateTopic, unit, deviceClass, deviceId);
+    }
+    else
+    {
+        snprintf(payload, sizeof(payload),
+                 "{\"name\":\"%s\",\"unique_id\":\"%s_%s\",\"state_topic\":\"%s\","
+                 "\"unit_of_measurement\":\"%s\","
+                 "\"device\":{\"identifiers\":[\"%s\"],\"name\":\"SmartGarden\"}}",
+                 name, deviceId, objectId, stateTopic, unit, deviceId);
+    }
     return publish(topic, payload);
 }
 
@@ -207,7 +218,7 @@ bool MQTTService::publishDiscoverySelect()
     char options[700];
     size_t offset = 0;
     offset += snprintf(options + offset, sizeof(options) - offset, "[");
-    for (uint8_t i = 0; i < count && offset < sizeof(options); ++i)
+    for (uint8_t i = 0; i < count && (offset + 2) < sizeof(options); ++i)
     {
         offset += snprintf(options + offset, sizeof(options) - offset,
                            "%s\"%s\"", (i == 0) ? "" : ",", crops[i].name);
@@ -235,7 +246,7 @@ bool MQTTService::publishDiscovery()
     ok &= publishDiscoverySensor("humidity", "SmartGarden Humidity",
                                  "smartgarden/sensors/humidity", "%", "humidity");
     ok &= publishDiscoverySensor("soil_moisture", "SmartGarden Soil Moisture",
-                                 "smartgarden/sensors/soil_moisture", "%", "humidity");
+                                 "smartgarden/sensors/soil_moisture", "%", nullptr);
     ok &= publishDiscoverySwitch("fan", "SmartGarden Fan");
     ok &= publishDiscoverySwitch("heater", "SmartGarden Heater");
     ok &= publishDiscoverySwitch("cooler", "SmartGarden Cooler");

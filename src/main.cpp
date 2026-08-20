@@ -36,6 +36,7 @@ unsigned long lastStatusPublish = 0;
 unsigned long lastMqttReconnect = 0;
 unsigned long bootMillis = 0;
 bool mqttWasConnected = false;
+bool hasValidSensorSnapshot = false;
 
 const CropProfile* activeProfile = nullptr;
 
@@ -104,7 +105,10 @@ void onRelayCommand(const char* relayName, bool state)
 
     if (mqttService != nullptr && mqttService->isConnected())
     {
-        mqttService->publishRelayState(relayName, relayManager.getRelayState(static_cast<uint8_t>(relayIndex)));
+        bool currentState = (relayIndex == IRRIGATION_RELAY_INDEX)
+                                ? irrigationManager.isActive()
+                                : relayManager.getRelayState(static_cast<uint8_t>(relayIndex));
+        mqttService->publishRelayState(relayName, currentState);
     }
 }
 
@@ -172,6 +176,14 @@ void setup()
     networkService = new NetworkService(systemConfig.wifiSSID, systemConfig.wifiPassword);
     networkService->begin();
 
+    uint8_t wifiAttempts = 0;
+    while (!networkService->isConnected() && wifiAttempts < 20)
+    {
+        delay(500);
+        networkService->loop();
+        ++wifiAttempts;
+    }
+
     mqttService = new MQTTService(systemConfig.mqttBroker, systemConfig.mqttPort);
     mqttService->begin(systemConfig.mqttUsername, systemConfig.mqttPassword);
     mqttService->setRelayCommandCallback(onRelayCommand);
@@ -205,6 +217,7 @@ void loop()
     {
         if (!mqttService->isConnected() && (now - lastMqttReconnect >= MQTT_RECONNECT_INTERVAL))
         {
+            mqttWasConnected = false;
             lastMqttReconnect = now;
             mqttService->connect();
         }
@@ -224,6 +237,7 @@ void loop()
         lastSensorRead = now;
         if (sensorManager.readSensors())
         {
+            hasValidSensorSnapshot = true;
             const SensorSnapshot& snapshot = sensorManager.getSnapshot();
             dataLogger.logSensorData(snapshot);
             if (mqttService != nullptr && mqttService->isConnected())
@@ -236,7 +250,7 @@ void loop()
     if (now - lastControlUpdate >= systemConfig.climateControlInterval)
     {
         lastControlUpdate = now;
-        if (activeProfile != nullptr)
+        if (activeProfile != nullptr && hasValidSensorSnapshot)
         {
             const SensorSnapshot& snapshot = sensorManager.getSnapshot();
             CommandQueue commands;
