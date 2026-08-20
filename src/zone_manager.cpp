@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include "zone_manager.h"
 
 ZoneManager::ZoneManager()
