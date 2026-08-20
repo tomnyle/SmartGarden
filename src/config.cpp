@@ -3,17 +3,17 @@
 #include <EEPROM.h>
 
 // Default configuration
-static const SystemConfig DEFAULT_CONFIG = {
-    .deviceName = "SmartGarden",
-    .wifiSSID = "Le Danh",
-    .wifiPassword = "123456789",
-    .mqttBroker = "192.168.100.166",
-    .mqttPort = 1883,
-    .mqttUsername = "homer",
-    .mqttPassword = "Danh@@@1992",
-    .sensorReadInterval = 5000,
-    .climateControlInterval = 10000,
-    .publishInterval = 5000
+static SystemConfig DEFAULT_CONFIG = {
+    "SmartGarden",           // deviceName
+    "Le Danh",               // wifiSSID
+    "123456789",             // wifiPassword
+    "192.168.100.166",       // mqttBroker
+    1883,                    // mqttPort
+    "homer",                 // mqttUsername
+    "Danh@@@1992",           // mqttPassword
+    5000,                    // sensorReadInterval
+    10000,                   // climateControlInterval
+    5000                     // publishInterval
 };
 
 #define CONFIG_EEPROM_ADDR 0
