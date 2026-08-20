@@ -3,10 +3,8 @@
 #include <DHT.h>
 #include <HardwareSerial.h>
 
-// DHT sensor setup
-#define DHT_PIN 4
-#define DHT_TYPE DHT22
-DHT dht(DHT_PIN, DHT_TYPE);
+// Declare as extern - defined in smartgarden.ino
+extern DHT dht;
 
 // RS485 Serial (Serial2 on ESP32)
 #define RS485_RX 16
@@ -20,8 +18,7 @@ SensorManager::SensorManager()
 
 void SensorManager::begin()
 {
-    // Initialize DHT22
-    dht.begin();
+    // Initialize DHT22 (already initialized in smartgarden.ino)
     
     // Initialize RS485 Serial communication
     Serial2.begin(9600, SERIAL_8N1, RS485_RX, RS485_TX);
