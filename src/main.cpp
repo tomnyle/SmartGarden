@@ -44,7 +44,7 @@ void relayCommandCallback(uint8_t relayIndex, bool state)
     Serial.printf("[App] Relay %u command: %s\n", relayIndex, state ? "ON" : "OFF");
     relayManager.setRelay(relayIndex, state);
     delay(100);
-    mqttService.publishRelayStatus(relayIndex, relayManager.getState(relayIndex));
+    mqttService.publishRelayStatus(relayIndex, relayManager.getRelayState(relayIndex));
 }
 
 void cropSelectCallback(const char* cropName)
@@ -150,7 +150,8 @@ void setup()
         Serial.println("[MQTT] ✗ Failed to connect (will retry in loop)");
     }
     
-    Serial.println("========== Setup Complete ==========\n");
+    Serial.println("========== Setup Complete ==========");
+    Serial.println();
     
     // Initialize timing variables
     lastSensorRead = millis();
@@ -199,7 +200,8 @@ void loop()
             Serial.printf("Soil Temp   : %.1f °C\n", snapshot.soilTemp);
             Serial.printf("pH          : %.1f\n", snapshot.ph);
             Serial.printf("EC          : %u µS/cm\n", snapshot.ec);
-            Serial.println("=================================\n");
+            Serial.println("=================================");
+            Serial.println();
             
             // Log sensor data
             dataLogger.logSensorData(snapshot);
@@ -220,9 +222,6 @@ void loop()
     
     // ===== Irrigation Manager Loop =====
     irrigationManager.loop();
-    
-    // ===== Zone Manager Loop =====
-    zoneManager.loop();
     
     // ===== Publish Relay Status =====
     if (now - lastRelayStatusPublish >= 10000) // Every 10 seconds
@@ -247,7 +246,8 @@ void loop()
             
             Serial.println("\n========== RELAY STATUS ==========");
             relayManager.printStatus();
-            Serial.println("==================================\n");
+            Serial.println("==================================");
+            Serial.println();
         }
     }
     
