@@ -3,8 +3,9 @@
 #include <PubSubClient.h>
 #include <WiFi.h>
 
-WiFiClient espClient;
-PubSubClient mqttClient(espClient);
+// Declare as extern - defined in smartgarden.ino
+extern WiFiClient espClient;
+extern PubSubClient client;
 
 MQTTService::MQTTService(const char* broker, int port)
     : mqttBroker(broker), mqttPort(port), connected(false),
@@ -16,8 +17,8 @@ MQTTService::MQTTService(const char* broker, int port)
 
 void MQTTService::begin(const char* username, const char* password)
 {
-    mqttClient.setServer(mqttBroker, mqttPort);
-    mqttClient.setCallback([this](char* topic, byte* payload, unsigned int length) {
+    client.setServer(mqttBroker, mqttPort);
+    client.setCallback([this](char* topic, byte* payload, unsigned int length) {
         this->onMessageReceived(topic, payload, length);
     });
     
@@ -36,16 +37,16 @@ bool MQTTService::connect()
     
     Serial.printf("[MQTTService] Connecting to %s:%d...\n", mqttBroker, mqttPort);
     
-    if (!mqttClient.connected())
+    if (!client.connected())
     {
-        if (mqttClient.connect(deviceId, mqttUsername, mqttPassword))
+        if (client.connect(deviceId, mqttUsername, mqttPassword))
         {
             Serial.println("[MQTTService] Connected to MQTT broker");
             connected = true;
             
             // Subscribe to control topics
             String topic = String("garden/") + String(deviceId) + "/control/#";
-            mqttClient.subscribe(topic.c_str());
+            client.subscribe(topic.c_str());
             
             // Publish online status
             publishStatus("online");
@@ -54,7 +55,7 @@ bool MQTTService::connect()
         }
         else
         {
-            Serial.printf("[MQTTService] Connection failed, code=%d\n", mqttClient.state());
+            Serial.printf("[MQTTService] Connection failed, code=%d\n", client.state());
             connected = false;
             return false;
         }
@@ -65,12 +66,12 @@ bool MQTTService::connect()
 
 bool MQTTService::isConnected() const
 {
-    return mqttClient.connected();
+    return client.connected();
 }
 
 void MQTTService::loop()
 {
-    if (!mqttClient.connected())
+    if (!client.connected())
     {
         if (millis() % 5000 == 0) // Attempt reconnect every 5 seconds
         {
@@ -79,24 +80,24 @@ void MQTTService::loop()
     }
     else
     {
-        mqttClient.loop();
+        client.loop();
     }
 }
 
 bool MQTTService::publish(const char* topic, const char* payload)
 {
-    if (!mqttClient.connected())
+    if (!client.connected())
     {
         return false;
     }
     
     String fullTopic = String("garden/") + String(deviceId) + "/" + String(topic);
-    return mqttClient.publish(fullTopic.c_str(), payload);
+    return client.publish(fullTopic.c_str(), payload);
 }
 
 bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
 {
-    if (!mqttClient.connected())
+    if (!client.connected())
     {
         return false;
     }
@@ -111,7 +112,7 @@ bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
     // Create JSON payload
     char payload[512];
     snprintf(payload, sizeof(payload),
-            "{\"airTemp\"%.1f,\"airHumidity\":%.1f,\"soilMoisture\":%.1f,"
+            "{\"airTemp\":%.1f,\"airHumidity\":%.1f,\"soilMoisture\":%.1f,"
             "\"soilTemp\":%.1f,\"ph\":%.1f,\"ec\":%u,\"nitrogen\":%u,"
             "\"phosphorus\":%u,\"potassium\":%u}",
             snapshot.airTemp, snapshot.airHumidity, snapshot.soilMoisture,
@@ -128,7 +129,7 @@ bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
 
 bool MQTTService::publishCropList()
 {
-    if (!mqttClient.connected())
+    if (!client.connected())
     {
         return false;
     }
@@ -136,12 +137,11 @@ bool MQTTService::publishCropList()
     // Get crop list from CropProfileStore
     char payload[1024];
     snprintf(payload, sizeof(payload),
-            "{\"crops\":[{\"%s\"},{\"id\":2,\"name\":\"Cà chua\"},{\"id\":3,\"name\":\"Dâu tây\"}"
+            "{\"crops\":[{\"id\":1,\"name\":\"Sâm\"},{\"id\":2,\"name\":\"Cà chua\"},{\"id\":3,\"name\":\"Dâu tây\"}"
             ",{\"id\":4,\"name\":\"Rau mầm\"},{\"id\":5,\"name\":\"Cải kale\"},{\"id\":6,\"name\":\"Bánh chua\"}"
             ",{\"id\":7,\"name\":\"Thơm\"},{\"id\":8,\"name\":\"Xà lách\"},{\"id\":9,\"name\":\"Ớt\"}"
             ",{\"id\":10,\"name\":\"Cúc họa mi\"},{\"id\":11,\"name\":\"Chanh\"},{\"id\":12,\"name\":\"Bạc hà\"}"
-            ",{\"id\":13,\"name\":\"Tỏi\"}]}",
-            "{\"id\":1,\"name\":\"Sâm\"}");
+            ",{\"id\":13,\"name\":\"Tỏi\"}]}");
     
     bool result = publish("crops/list", payload);
     if (result)
@@ -153,7 +153,7 @@ bool MQTTService::publishCropList()
 
 bool MQTTService::publishCropConfig(const CropProfile& profile)
 {
-    if (!mqttClient.connected())
+    if (!client.connected())
     {
         return false;
     }
