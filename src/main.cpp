@@ -2,233 +2,269 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <DHT.h>
-#include <ModbusMaster.h>
+#include <string.h>
 
-// Include all service headers
 #include "sensor_manager.h"
 #include "mqtt_service.h"
 #include "network_service.h"
 #include "climate_manager.h"
 #include "irrigation_manager.h"
-#include "zone_manager.h"
 #include "relay_manager.h"
 #include "data_logger.h"
 #include "garden_profile.h"
 #include "auto_control.h"
 #include "config.h"
+#include "pins.h"
+#include "app_config.h"
 
-// ================= GLOBAL OBJECTS =================
-// WiFi and MQTT
 WiFiClient espClient;
 PubSubClient client(espClient);
+DHT dht(DHT_PIN, DHT_TYPE);
 
-// Services
 SensorManager sensorManager;
-MQTTService mqttService("192.168.100.166", 1883);
-NetworkService networkService("Le Danh", "123456789");
+NetworkService* networkService = nullptr;
+MQTTService* mqttService = nullptr;
 ClimateManager climateManager;
 IrrigationManager irrigationManager;
-ZoneManager zoneManager;
 RelayManager relayManager;
 DataLogger dataLogger;
-
-// Configuration
 SystemConfig systemConfig;
 
-// ================= TIMING VARIABLES =================
 unsigned long lastSensorRead = 0;
 unsigned long lastControlUpdate = 0;
-unsigned long lastPublish = 0;
-unsigned long lastDataLog = 0;
+unsigned long lastStatusPublish = 0;
+unsigned long lastMqttReconnect = 0;
+unsigned long bootMillis = 0;
+bool mqttWasConnected = false;
 
-// ================= SETUP FUNCTION =================
+const CropProfile* activeProfile = nullptr;
+
+static const char* RELAY_NAMES[] = {
+    "fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation"
+};
+
+static const uint8_t RELAY_INDICES[] = {
+    CLIMATE_FAN_RELAY_INDEX,
+    CLIMATE_HEATER_RELAY_INDEX,
+    CLIMATE_COOLER_RELAY_INDEX,
+    CLIMATE_HUMIDIFIER_RELAY_INDEX,
+    CLIMATE_DEHUMIDIFIER_RELAY_INDEX,
+    IRRIGATION_RELAY_INDEX
+};
+
+int getRelayIndexByName(const char* relayName)
+{
+    for (size_t i = 0; i < sizeof(RELAY_NAMES) / sizeof(RELAY_NAMES[0]); ++i)
+    {
+        if (strcmp(relayName, RELAY_NAMES[i]) == 0)
+        {
+            return RELAY_INDICES[i];
+        }
+    }
+    return -1;
+}
+
+void publishAllRelayStates()
+{
+    if (mqttService == nullptr || !mqttService->isConnected())
+    {
+        return;
+    }
+
+    for (size_t i = 0; i < sizeof(RELAY_NAMES) / sizeof(RELAY_NAMES[0]); ++i)
+    {
+        bool state = relayManager.getRelayState(RELAY_INDICES[i]);
+        mqttService->publishRelayState(RELAY_NAMES[i], state);
+    }
+}
+
+void onRelayCommand(const char* relayName, bool state)
+{
+    int relayIndex = getRelayIndexByName(relayName);
+    if (relayIndex < 0)
+    {
+        return;
+    }
+
+    if (relayIndex == IRRIGATION_RELAY_INDEX)
+    {
+        if (state)
+        {
+            irrigationManager.start();
+        }
+        else
+        {
+            irrigationManager.stop();
+        }
+    }
+    else
+    {
+        relayManager.setRelay(static_cast<uint8_t>(relayIndex), state);
+    }
+
+    if (mqttService != nullptr && mqttService->isConnected())
+    {
+        mqttService->publishRelayState(relayName, relayManager.getRelayState(static_cast<uint8_t>(relayIndex)));
+    }
+}
+
+void onCropSelect(const char* cropName)
+{
+    const CropProfile* selected = CropProfileStore::getCropByName(cropName);
+    if (selected == nullptr)
+    {
+        return;
+    }
+
+    activeProfile = selected;
+    climateManager.setCurrentProfile(activeProfile);
+    Serial.printf("[Main] Active crop set to: %s\n", activeProfile->name);
+
+    if (mqttService != nullptr && mqttService->isConnected())
+    {
+        mqttService->publishCurrentCrop(activeProfile->name);
+    }
+}
+
+void publishBootstrapTopics()
+{
+    if (mqttService == nullptr || !mqttService->isConnected())
+    {
+        return;
+    }
+
+    mqttService->publishStatus(true);
+    mqttService->publishDiscovery();
+    mqttService->publishCropList();
+    if (activeProfile != nullptr)
+    {
+        mqttService->publishCurrentCrop(activeProfile->name);
+    }
+    publishAllRelayStates();
+}
+
 void setup()
 {
     Serial.begin(115200);
     delay(2000);
-    
+    bootMillis = millis();
+
     Serial.println("\n\n========== SmartGarden System Starting ==========");
-    
-    // Load configuration
-    Serial.println("[Setup] Loading configuration...");
+
     if (!loadConfig(systemConfig))
     {
         systemConfig = getDefaultConfig();
         saveConfig(systemConfig);
     }
     printConfig(systemConfig);
-    
-    // Initialize relay manager
-    Serial.println("[Setup] Initializing relay manager...");
+
+    CropProfileStore::initialize();
+    activeProfile = CropProfileStore::getCropById(1);
+
     relayManager.begin();
-    
-    // Initialize sensor manager
-    Serial.println("[Setup] Initializing sensor manager...");
+    dht.begin();
     sensorManager.begin();
-    
-    // Initialize data logger
-    Serial.println("[Setup] Initializing data logger...");
     dataLogger.begin();
-    
-    // Initialize climate manager
-    Serial.println("[Setup] Initializing climate manager...");
-    climateManager.begin();
-    
-    // Initialize irrigation manager
-    Serial.println("[Setup] Initializing irrigation manager...");
-    irrigationManager.begin();
-    
-    // Initialize zone manager
-    Serial.println("[Setup] Initializing zone manager...");
-    zoneManager.begin();
-    
-    // Connect to WiFi
-    Serial.printf("[Setup] Connecting to WiFi: %s\n", systemConfig.wifiSSID);
-    networkService.begin();
-    
-    int attempts = 0;
-    while (!networkService.isConnected() && attempts < 20)
+    climateManager.begin(&relayManager);
+    climateManager.setCurrentProfile(activeProfile);
+    irrigationManager.begin(&relayManager);
+
+    networkService = new NetworkService(systemConfig.wifiSSID, systemConfig.wifiPassword);
+    networkService->begin();
+
+    mqttService = new MQTTService(systemConfig.mqttBroker, systemConfig.mqttPort);
+    mqttService->begin(systemConfig.mqttUsername, systemConfig.mqttPassword);
+    mqttService->setRelayCommandCallback(onRelayCommand);
+    mqttService->setCropSelectCallback(onCropSelect);
+
+    if (mqttService->connect())
     {
-        delay(500);
-        Serial.print(".");
-        attempts++;
-        networkService.loop();
+        publishBootstrapTopics();
+        mqttWasConnected = true;
     }
-    Serial.println();
-    
-    if (networkService.isConnected())
-    {
-        Serial.println("[WiFi] ✓ Connected!");
-    }
-    else
-    {
-        Serial.println("[WiFi] ✗ Failed to connect (will retry in loop)");
-    }
-    
-    // Setup MQTT
-    Serial.printf("[Setup] Initializing MQTT: %s:%u\n", systemConfig.mqttBroker, systemConfig.mqttPort);
-    mqttService.begin(systemConfig.mqttUsername, systemConfig.mqttPassword);
-    
-    // Connect to MQTT
-    if (mqttService.connect())
-    {
-        Serial.println("[MQTT] ✓ Connected!");
-    }
-    else
-    {
-        Serial.println("[MQTT] ✗ Failed to connect (will retry in loop)");
-    }
-    
-    Serial.println("========== Setup Complete ==========\n");
-    
-    // Initialize timing variables
+
     lastSensorRead = millis();
     lastControlUpdate = millis();
-    lastPublish = millis();
-    lastDataLog = millis();
+    lastStatusPublish = millis();
 }
 
-// ================= LOOP FUNCTION =================
 void loop()
 {
     unsigned long now = millis();
-    
-    // ===== Network Management =====
-    if (!networkService.isConnected())
+
+    if (networkService != nullptr)
     {
-        networkService.begin();
-    }
-    networkService.loop();
-    
-    // ===== MQTT Management =====
-    if (!mqttService.isConnected())
-    {
-        if (now - lastPublish > 5000) // Try reconnect every 5 seconds
+        if (!networkService->isConnected())
         {
-            mqttService.connect();
-            lastPublish = now;
+            networkService->begin();
         }
+        networkService->loop();
     }
-    mqttService.loop();
-    client.loop(); // Ensure PubSubClient loop runs
-    
-    // ===== Read Sensors =====
+
+    if (mqttService != nullptr)
+    {
+        if (!mqttService->isConnected() && (now - lastMqttReconnect >= MQTT_RECONNECT_INTERVAL))
+        {
+            lastMqttReconnect = now;
+            mqttService->connect();
+        }
+
+        mqttService->loop();
+
+        bool mqttConnected = mqttService->isConnected();
+        if (mqttConnected && !mqttWasConnected)
+        {
+            publishBootstrapTopics();
+        }
+        mqttWasConnected = mqttConnected;
+    }
+
     if (now - lastSensorRead >= systemConfig.sensorReadInterval)
     {
         lastSensorRead = now;
-        
-        SensorSnapshot snapshot;
-        if (sensorManager.readSensors(snapshot))
+        if (sensorManager.readSensors())
         {
-            Serial.println("\n========== SENSOR DATA ==========");
-            Serial.printf("Air Temp     : %.1f °C\n", snapshot.airTemp);
-            Serial.printf("Air Humidity : %.1f %%\n", snapshot.airHumidity);
-            Serial.printf("Soil Moisture: %.1f %%\n", snapshot.soilMoisture);
-            Serial.printf("Soil Temp    : %.1f °C\n", snapshot.soilTemp);
-            Serial.printf("pH           : %.1f\n", snapshot.ph);
-            Serial.printf("EC           : %u µS/cm\n", snapshot.ec);
-            Serial.printf("Nitrogen     : %u mg/kg\n", snapshot.nitrogen);
-            Serial.printf("Phosphorus   : %u mg/kg\n", snapshot.phosphorus);
-            Serial.printf("Potassium    : %u mg/kg\n", snapshot.potassium);
-            Serial.println("=================================\n");
-            
-            // Log sensor data
+            const SensorSnapshot& snapshot = sensorManager.getSnapshot();
             dataLogger.logSensorData(snapshot);
-            
-            // Publish sensor data to MQTT
-            if (mqttService.isConnected())
+            if (mqttService != nullptr && mqttService->isConnected())
             {
-                mqttService.publishSensorData(snapshot);
+                mqttService->publishSensorData(snapshot);
             }
         }
     }
-    
-    // ===== Auto Control =====
+
     if (now - lastControlUpdate >= systemConfig.climateControlInterval)
     {
         lastControlUpdate = now;
-        
-        // Get current sensor snapshot
-        SensorSnapshot snapshot;
-        if (sensorManager.readSensors(snapshot))
+        if (activeProfile != nullptr)
         {
-            // Get active crop profile
-            CropProfile activeProfile = CropProfileStore::getProfile(1); // Default to profile 1
-            
-            // Evaluate and generate control commands
+            const SensorSnapshot& snapshot = sensorManager.getSnapshot();
             CommandQueue commands;
-            AutoControlSystem::evaluateAndControl(activeProfile, snapshot, commands);
-            
-            // Execute relay commands
-            for (uint8_t i = 0; i < commands.count; i++)
+            AutoControlSystem::evaluateAndControl(*activeProfile, snapshot, commands);
+
+            for (uint8_t i = 0; i < commands.count; ++i)
             {
-                relayManager.setRelay(commands.commands[i].relayIndex, 
-                                    commands.commands[i].state);
+                relayManager.setRelay(commands.commands[i].relayIndex, commands.commands[i].state);
             }
+
+            publishAllRelayStates();
         }
     }
-    
-    // ===== Climate Manager Loop =====
-    climateManager.loop();
-    
-    // ===== Irrigation Manager Loop =====
+
     irrigationManager.loop();
-    
-    // ===== Zone Manager Loop =====
-    zoneManager.loop();
-    
-    // ===== Periodic Status Publish =====
-    if (now - lastPublish >= 30000) // Publish status every 30 seconds
+
+    if (mqttService != nullptr && mqttService->isConnected() &&
+        (now - lastStatusPublish >= PUBLISH_STATUS_INTERVAL))
     {
-        lastPublish = now;
-        
-        if (mqttService.isConnected())
+        lastStatusPublish = now;
+        mqttService->publishStatus(true);
+        mqttService->publishUptime((now - bootMillis) / 1000U);
+        publishAllRelayStates();
+        if (activeProfile != nullptr)
         {
-            mqttService.publishStatus("online");
-            relayManager.printStatus();
-            dataLogger.printAllLogs();
+            mqttService->publishCurrentCrop(activeProfile->name);
         }
     }
-    
-    delay(10); // Small delay to prevent watchdog timeout
+
+    delay(10);
 }

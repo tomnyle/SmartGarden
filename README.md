@@ -73,30 +73,30 @@ SmartGarden là một hệ thống IoT hoàn chỉnh cho phép quản lý **13 l
 ## 📡 MQTT Topics
 
 ```
-# Quản lý Cây
-smartgarden/crop/list              → Danh sách tất cả loại cây
-smartgarden/crop/set               → Chọn loại cây (Payload: "lettuce")
-smartgarden/crop/current           → Loại cây hiện tại
-smartgarden/crop/config            → Cấu hình loại cây hiện tại (JSON)
+smartgarden/sensors/temperature
+smartgarden/sensors/humidity
+smartgarden/sensors/soil_moisture
+smartgarden/sensors/timestamp
 
-# Dữ liệu Cảm Biến
-smartgarden/sensors/air_temp       → Nhiệt độ không khí (°C)
-smartgarden/sensors/air_humidity   → Độ ẩm không khí (%)
-smartgarden/sensors/soil_moisture  → Độ ẩm đất (%)
-smartgarden/sensors/soil_temp      → Nhiệt độ đất (°C)
-smartgarden/sensors/ph             → Giá trị pH
-smartgarden/sensors/ec             → Độ dẫn điện (uS/cm)
-smartgarden/sensors/nitrogen       → Nitrogen (mg/kg)
-smartgarden/sensors/phosphorus     → Phosphorus (mg/kg)
-smartgarden/sensors/potassium      → Potassium (mg/kg)
+smartgarden/relays/fan/state
+smartgarden/relays/fan/set
+smartgarden/relays/heater/state
+smartgarden/relays/heater/set
+smartgarden/relays/cooler/state
+smartgarden/relays/cooler/set
+smartgarden/relays/humidifier/state
+smartgarden/relays/humidifier/set
+smartgarden/relays/dehumidifier/state
+smartgarden/relays/dehumidifier/set
+smartgarden/relays/irrigation/state
+smartgarden/relays/irrigation/set
 
-# Relay & Điều Khiển
-smartgarden/relay/1/state          → Trạng thái relay 1
-smartgarden/relay/1/set            → Điều khiển relay 1
-smartgarden/autocontrol/state      → Trạng thái auto control
+smartgarden/crop/current
+smartgarden/crop/available
+smartgarden/crop/select
 
-# Cảnh Báo
-smartgarden/alerts                 → Các cảnh báo thời gian thực
+smartgarden/status/online
+smartgarden/status/uptime
 ```
 
 ## 🔧 Cấu Hình
