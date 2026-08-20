@@ -42,6 +42,7 @@ unsigned long lastControlUpdate = 0;
 unsigned long lastPublish = 0;
 unsigned long lastDataLog = 0;
 unsigned long lastRelayStatusPublish = 0;
+unsigned long lastDiscoveryPublish = 0;
 
 // ================= CALLBACK FUNCTIONS =================
 void relayCommandCallback(uint8_t relayIndex, bool state)
@@ -78,6 +79,7 @@ void setup()
     
     Serial.println("\n\n========== SmartGarden System Starting ==========");
     Serial.printf("[App] Version: %s\n", APP_VERSION);
+    Serial.printf("[App] Device ID: %s\n", "smartgarden");
     
     // Record system start time
     systemStartTime = millis();
@@ -167,6 +169,7 @@ void setup()
     lastPublish = millis();
     lastDataLog = millis();
     lastRelayStatusPublish = millis();
+    lastDiscoveryPublish = millis();
 }
 
 // ================= LOOP FUNCTION =================
@@ -191,6 +194,17 @@ void loop()
         }
     }
     mqttService.loop();
+    
+    // ===== Republish Discovery Messages Every 5 minutes =====
+    if (now - lastDiscoveryPublish > 300000) // 5 minutes
+    {
+        lastDiscoveryPublish = now;
+        if (mqttService.isConnected())
+        {
+            Serial.println("[App] Republishing discovery messages...");
+            mqttService.publishDiscoveryMessages();
+        }
+    }
     
     // ===== Read Sensors =====
     if (now - lastSensorRead >= SENSOR_READ_INTERVAL)
