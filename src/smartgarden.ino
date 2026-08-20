@@ -7,6 +7,7 @@
 #include "crop_profiles.h"
 #include "auto_control.h"
 #include "mqtt_handler.h"
+#include "app_config.h"
 
 // ================= WIFI =================
 WiFiClient espClient;
@@ -29,9 +30,6 @@ ModbusMaster node;
 int relayPins[RELAY_COUNT] = {5, 18, 19, 27, 32, 33, 25, 26};
 bool relayState[RELAY_COUNT] = {false};
 
-// ================= CROP STORE =================
-CropProfileStore cropStore;
-
 // ================= RS485 =================
 void preTransmission()
 {
@@ -47,7 +45,7 @@ void postTransmission()
 void setup_wifi()
 {
     Serial.print("Connecting WiFi");
-    WiFi.begin(SMARTGARDEN_WIFI_SSID, SMARTGARDEN_WIFI_PASSWORD);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20)
@@ -101,17 +99,6 @@ void callback(char *topic, byte *payload, unsigned int length)
     Serial.print(" = ");
     Serial.println(msg);
 
-    // Handle crop selection
-    if (String(topic) == "smartgarden/crop/set")
-    {
-        if (cropStore.setActiveByName(msg.c_str()))
-        {
-            cropStore.save();
-            Serial.println("Crop changed to: " + msg);
-            publishCurrentCropConfig();
-        }
-    }
-
     // Handle relay control
     for (int i = 0; i < RELAY_COUNT; i++)
     {
@@ -137,14 +124,13 @@ void reconnect()
     {
         Serial.print("MQTT...");
 
-        if (client.connect(SMARTGARDEN_DEVICE_ID,
-                           SMARTGARDEN_MQTT_USERNAME,
-                           SMARTGARDEN_MQTT_PASSWORD))
+        if (client.connect("ESP32_SmartGarden",
+                           MQTT_USERNAME,
+                           MQTT_PASSWORD))
         {
             Serial.println("CONNECTED");
 
             // Subscribe to topics
-            client.subscribe("smartgarden/crop/set");
             for (int i = 0; i < RELAY_COUNT; i++)
             {
                 String topic = "smartgarden/relay/" + String(i + 1) + "/set";
@@ -198,17 +184,13 @@ void setup()
     node.postTransmission(postTransmission);
 
     // Initialize Crop Store
-    if (!cropStore.load())
-    {
-        Serial.println("Loading default crop profiles...");
-        cropStore.loadDefaults();
-    }
+    CropProfileStore::initialize();
 
     // Connect WiFi
     setup_wifi();
 
     // Setup MQTT
-    client.setServer(SMARTGARDEN_MQTT_HOST, SMARTGARDEN_MQTT_PORT);
+    client.setServer(MQTT_BROKER, MQTT_PORT);
     client.setCallback(callback);
     reconnect();
 
@@ -217,7 +199,6 @@ void setup()
 
 // ================= LOOP =================
 unsigned long lastSensorRead = 0;
-unsigned long lastControlUpdate = 0;
 
 void loop()
 {
@@ -236,7 +217,7 @@ void loop()
     unsigned long now = millis();
 
     // Read sensors and control
-    if (now - lastSensorRead >= SENSOR_UPDATE_MS)
+    if (now - lastSensorRead >= SENSOR_READ_INTERVAL)
     {
         lastSensorRead = now;
 
@@ -270,35 +251,6 @@ void loop()
             Serial.println(result);
         }
 
-        // Get active crop profile
-        const CropProfile *activeCrop = cropStore.getActive();
-        if (activeCrop != nullptr)
-        {
-            // Create sensor snapshot
-            SensorSnapshot snapshot;
-            snapshot.airTemp = airTemp;
-            snapshot.airHumidity = airHum;
-            snapshot.soilMoisture = moisture;
-            snapshot.soilTemp = soilTemp;
-            snapshot.ph = ph;
-            snapshot.ec = ec;
-            snapshot.nitrogen = n;
-            snapshot.phosphorus = p;
-            snapshot.potassium = k;
-            snapshot.timestamp = now;
-
-            // Evaluate and control
-            AutoControlSystem::CommandQueue commands;
-            AutoControlSystem::evaluateAndControl(*activeCrop, snapshot, commands);
-
-            // Apply relay commands
-            for (size_t i = 0; i < commands.count; ++i)
-            {
-                const RelayCommand &cmd = commands.commands[i];
-                setRelay(cmd.relayIndex, cmd.state);
-            }
-        }
-
         // Publish sensor data
         client.publish("smartgarden/sensors/air_temp", String(airTemp, 1).c_str(), true);
         client.publish("smartgarden/sensors/air_humidity", String(airHum, 1).c_str(), true);
@@ -312,7 +264,6 @@ void loop()
 
         // Serial output
         Serial.println("\n===== GARDEN DATA =====");
-        Serial.printf("Active Crop: %s\n", activeCrop ? activeCrop->name : "None");
         Serial.printf("Air Temp : %.1f C\n", airTemp);
         Serial.printf("Humidity : %.1f %%\n", airHum);
         Serial.printf("Moisture : %.1f %%\n", moisture);
