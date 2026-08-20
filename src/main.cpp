@@ -4,6 +4,10 @@
 #include <DHT.h>
 #include <ModbusMaster.h>
 
+// ================= FORWARD DECLARATIONS =================
+void publishRelayDiscovery();
+void publishSensorDiscovery();
+
 // ================= WIFI =================
 const char* ssid = "Le Danh";
 const char* password = "123456789";
