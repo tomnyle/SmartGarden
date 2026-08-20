@@ -1,5 +1,7 @@
 #include "climate_manager.h"
 #include "auto_control.h"
+#include <Arduino.h>
+#include "app_config.h"
 
 ClimateManager::ClimateManager()
     : currentProfile(nullptr), lastControlTime(0), controlInterval(10000)
@@ -40,17 +42,21 @@ void ClimateManager::control(const SensorSnapshot& snapshot)
     lastControlTime = now;
     
     // Use AutoControlSystem to evaluate and generate commands
-    AutoControlSystem::CommandQueue commandQueue;
+    CommandQueue commandQueue;
+    commandQueue.count = 0;
     AutoControlSystem::evaluateAndControl(*currentProfile, snapshot, commandQueue);
     
     // Execute all commands
     for (size_t i = 0; i < commandQueue.count; ++i)
     {
         const RelayCommand& cmd = commandQueue.commands[i];
-        relayManager->setRelay(cmd.relayIndex, cmd.state);
-        
-        Serial.printf("[ClimateManager] Relay %u -> %s\n",
-                     cmd.relayIndex, cmd.state ? "ON" : "OFF");
+        if (relayManager != nullptr)
+        {
+            relayManager->setRelay(cmd.relayIndex, cmd.state);
+            
+            Serial.printf("[ClimateManager] Relay %u -> %s\n",
+                         cmd.relayIndex, cmd.state ? "ON" : "OFF");
+        }
     }
 }
 

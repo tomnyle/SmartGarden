@@ -1,4 +1,5 @@
 #include "garden_profile.h"
+#include <Arduino.h>
 
 // Initialize static member
 CropProfile CropProfileStore::cropProfiles[13] = {};
@@ -137,10 +138,10 @@ void CropProfileStore::initialize()
         .potassium = {150, 300}
     };
     
-    // 10. Cúc họa mi (Chamomile)
+    // 10. Cúc hoa mi (Chamomile)
     cropProfiles[9] = {
         .id = 10,
-        .name = "Cúc họa mi",
+        .name = "Cúc hoa mi",
         .temperature = {18.0f, 25.0f},
         .airHumidity = {60.0f, 75.0f},
         .soilHumidity = {50.0f, 70.0f},

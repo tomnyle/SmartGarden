@@ -1,4 +1,5 @@
 #include "sensor_manager.h"
+#include <Arduino.h>
 #include <DHT.h>
 #include <HardwareSerial.h>
 

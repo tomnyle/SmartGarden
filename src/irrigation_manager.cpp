@@ -1,4 +1,5 @@
 #include "irrigation_manager.h"
+#include <Arduino.h>
 
 IrrigationManager::IrrigationManager()
     : active(false), startTime(0), maxDuration(3600000), // 1 hour max by default
