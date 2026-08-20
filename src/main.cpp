@@ -2,9 +2,8 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <DHT.h>
-#include <ModbusMaster.h>
 
-// Include all service headers
+#include "app_config.h"
 #include "sensor_manager.h"
 #include "mqtt_service.h"
 #include "network_service.h"
@@ -14,32 +13,57 @@
 #include "relay_manager.h"
 #include "data_logger.h"
 #include "garden_profile.h"
-#include "auto_control.h"
-#include "config.h"
 
 // ================= GLOBAL OBJECTS =================
-// WiFi and MQTT
 WiFiClient espClient;
-PubSubClient client(espClient);
+PubSubClient pubsubClient(espClient);
 
-// Services
 SensorManager sensorManager;
-MQTTService mqttService("192.168.100.166", 1883);
-NetworkService networkService("Le Danh", "123456789");
+MQTTService mqttService(MQTT_BROKER, MQTT_PORT);
+NetworkService networkService(WIFI_SSID, WIFI_PASSWORD);
 ClimateManager climateManager;
 IrrigationManager irrigationManager;
 ZoneManager zoneManager;
 RelayManager relayManager;
 DataLogger dataLogger;
 
-// Configuration
-SystemConfig systemConfig;
+// Current crop profile
+const CropProfile* currentCrop = nullptr;
+unsigned long systemStartTime = 0;
 
 // ================= TIMING VARIABLES =================
 unsigned long lastSensorRead = 0;
 unsigned long lastControlUpdate = 0;
 unsigned long lastPublish = 0;
 unsigned long lastDataLog = 0;
+unsigned long lastRelayStatusPublish = 0;
+
+// ================= CALLBACK FUNCTIONS =================
+void relayCommandCallback(uint8_t relayIndex, bool state)
+{
+    Serial.printf("[App] Relay %u command: %s\n", relayIndex, state ? "ON" : "OFF");
+    relayManager.setRelay(relayIndex, state);
+    delay(100);
+    mqttService.publishRelayStatus(relayIndex, relayManager.getState(relayIndex));
+}
+
+void cropSelectCallback(const char* cropName)
+{
+    Serial.printf("[App] Crop selected: %s\n", cropName);
+    
+    const CropProfile* crop = CropProfileStore::getCropByName(cropName);
+    if (crop)
+    {
+        currentCrop = crop;
+        climateManager.setCurrentProfile(crop);
+        mqttService.publishCurrentCrop(crop);
+        Serial.printf("[App] ✓ Crop set to: %s\n", crop->name);
+    }
+    else
+    {
+        Serial.printf("[App] ✗ Crop not found: %s\n", cropName);
+    }
+}
 
 // ================= SETUP FUNCTION =================
 void setup()
@@ -48,15 +72,10 @@ void setup()
     delay(2000);
     
     Serial.println("\n\n========== SmartGarden System Starting ==========");
+    Serial.printf("[App] Version: %s\n", APP_VERSION);
     
-    // Load configuration
-    Serial.println("[Setup] Loading configuration...");
-    if (!loadConfig(systemConfig))
-    {
-        systemConfig = getDefaultConfig();
-        saveConfig(systemConfig);
-    }
-    printConfig(systemConfig);
+    // Record system start time
+    systemStartTime = millis();
     
     // Initialize relay manager
     Serial.println("[Setup] Initializing relay manager...");
@@ -72,18 +91,24 @@ void setup()
     
     // Initialize climate manager
     Serial.println("[Setup] Initializing climate manager...");
-    climateManager.begin();
+    climateManager.begin(&relayManager);
+    
+    // Initialize crop profiles
+    Serial.println("[Setup] Initializing crop profiles...");
+    CropProfileStore::initialize();
+    currentCrop = CropProfileStore::getCropById(1); // Default to Sâm (crop ID 1)
+    climateManager.setCurrentProfile(currentCrop);
     
     // Initialize irrigation manager
     Serial.println("[Setup] Initializing irrigation manager...");
-    irrigationManager.begin();
+    irrigationManager.begin(&relayManager);
     
     // Initialize zone manager
     Serial.println("[Setup] Initializing zone manager...");
-    zoneManager.begin();
+    zoneManager.begin(&relayManager);
     
     // Connect to WiFi
-    Serial.printf("[Setup] Connecting to WiFi: %s\n", systemConfig.wifiSSID);
+    Serial.printf("[Setup] Connecting to WiFi: %s\n", WIFI_SSID);
     networkService.begin();
     
     int attempts = 0;
@@ -106,13 +131,19 @@ void setup()
     }
     
     // Setup MQTT
-    Serial.printf("[Setup] Initializing MQTT: %s:%u\n", systemConfig.mqttBroker, systemConfig.mqttPort);
-    mqttService.begin(systemConfig.mqttUsername, systemConfig.mqttPassword);
+    Serial.printf("[Setup] Initializing MQTT: %s:%u\n", MQTT_BROKER, MQTT_PORT);
+    mqttService.setClient(&pubsubClient);
+    mqttService.begin(MQTT_USERNAME, MQTT_PASSWORD);
+    
+    // Set callbacks for MQTT commands
+    mqttService.setRelayCommandCallback(relayCommandCallback);
+    mqttService.setCropSelectCallback(cropSelectCallback);
     
     // Connect to MQTT
     if (mqttService.connect())
     {
         Serial.println("[MQTT] ✓ Connected!");
+        mqttService.publishCurrentCrop(currentCrop);
     }
     else
     {
@@ -126,6 +157,7 @@ void setup()
     lastControlUpdate = millis();
     lastPublish = millis();
     lastDataLog = millis();
+    lastRelayStatusPublish = millis();
 }
 
 // ================= LOOP FUNCTION =================
@@ -143,33 +175,30 @@ void loop()
     // ===== MQTT Management =====
     if (!mqttService.isConnected())
     {
-        if (now - lastPublish > 5000) // Try reconnect every 5 seconds
+        if (now - lastPublish > MQTT_RECONNECT_INTERVAL)
         {
             mqttService.connect();
             lastPublish = now;
         }
     }
     mqttService.loop();
-    client.loop(); // Ensure PubSubClient loop runs
     
     // ===== Read Sensors =====
-    if (now - lastSensorRead >= systemConfig.sensorReadInterval)
+    if (now - lastSensorRead >= SENSOR_READ_INTERVAL)
     {
         lastSensorRead = now;
         
-        SensorSnapshot snapshot;
-        if (sensorManager.readSensors(snapshot))
+        if (sensorManager.readSensors())
         {
+            SensorSnapshot snapshot = sensorManager.getSnapshot();
+            
             Serial.println("\n========== SENSOR DATA ==========");
-            Serial.printf("Air Temp     : %.1f °C\n", snapshot.airTemp);
-            Serial.printf("Air Humidity : %.1f %%\n", snapshot.airHumidity);
+            Serial.printf("Temperature : %.1f °C\n", snapshot.airTemp);
+            Serial.printf("Humidity    : %.1f %%\n", snapshot.airHumidity);
             Serial.printf("Soil Moisture: %.1f %%\n", snapshot.soilMoisture);
-            Serial.printf("Soil Temp    : %.1f °C\n", snapshot.soilTemp);
-            Serial.printf("pH           : %.1f\n", snapshot.ph);
-            Serial.printf("EC           : %u µS/cm\n", snapshot.ec);
-            Serial.printf("Nitrogen     : %u mg/kg\n", snapshot.nitrogen);
-            Serial.printf("Phosphorus   : %u mg/kg\n", snapshot.phosphorus);
-            Serial.printf("Potassium    : %u mg/kg\n", snapshot.potassium);
+            Serial.printf("Soil Temp   : %.1f °C\n", snapshot.soilTemp);
+            Serial.printf("pH          : %.1f\n", snapshot.ph);
+            Serial.printf("EC          : %u µS/cm\n", snapshot.ec);
             Serial.println("=================================\n");
             
             // Log sensor data
@@ -180,36 +209,14 @@ void loop()
             {
                 mqttService.publishSensorData(snapshot);
             }
-        }
-    }
-    
-    // ===== Auto Control =====
-    if (now - lastControlUpdate >= systemConfig.climateControlInterval)
-    {
-        lastControlUpdate = now;
-        
-        // Get current sensor snapshot
-        SensorSnapshot snapshot;
-        if (sensorManager.readSensors(snapshot))
-        {
-            // Get active crop profile
-            CropProfile activeProfile = CropProfileStore::getProfile(1); // Default to profile 1
             
-            // Evaluate and generate control commands
-            CommandQueue commands;
-            AutoControlSystem::evaluateAndControl(activeProfile, snapshot, commands);
-            
-            // Execute relay commands
-            for (uint8_t i = 0; i < commands.count; i++)
+            // Auto climate control based on crop profile
+            if (currentCrop)
             {
-                relayManager.setRelay(commands.commands[i].relayIndex, 
-                                    commands.commands[i].state);
+                climateManager.control(snapshot);
             }
         }
     }
-    
-    // ===== Climate Manager Loop =====
-    climateManager.loop();
     
     // ===== Irrigation Manager Loop =====
     irrigationManager.loop();
@@ -217,16 +224,30 @@ void loop()
     // ===== Zone Manager Loop =====
     zoneManager.loop();
     
+    // ===== Publish Relay Status =====
+    if (now - lastRelayStatusPublish >= 10000) // Every 10 seconds
+    {
+        lastRelayStatusPublish = now;
+        
+        if (mqttService.isConnected())
+        {
+            mqttService.publishAllRelayStatus(&relayManager);
+        }
+    }
+    
     // ===== Periodic Status Publish =====
-    if (now - lastPublish >= 30000) // Publish status every 30 seconds
+    if (now - lastPublish >= PUBLISH_STATUS_INTERVAL)
     {
         lastPublish = now;
         
         if (mqttService.isConnected())
         {
             mqttService.publishStatus("online");
+            mqttService.publishUptime(now - systemStartTime);
+            
+            Serial.println("\n========== RELAY STATUS ==========");
             relayManager.printStatus();
-            dataLogger.printAllLogs();
+            Serial.println("==================================\n");
         }
     }
     
