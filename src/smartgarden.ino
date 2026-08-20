@@ -9,7 +9,7 @@
 #include "mqtt_handler.h"
 #include "app_config.h"
 
-// ================= WIFI =================
+// ================= GLOBAL INSTANCES (defined once here) =================
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -30,7 +30,7 @@ ModbusMaster node;
 int relayPins[RELAY_COUNT] = {5, 18, 19, 27, 32, 33, 25, 26};
 bool relayState[RELAY_COUNT] = {false};
 
-// ================= RS485 =================
+// ================= RS485 CONTROL =================
 void preTransmission()
 {
     digitalWrite(MAX485_RE_DE, HIGH);
