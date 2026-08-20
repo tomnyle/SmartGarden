@@ -150,8 +150,7 @@ void setup()
         Serial.println("[MQTT] ✗ Failed to connect (will retry in loop)");
     }
     
-    Serial.println("========== Setup Complete ==========");
-    Serial.println();
+    Serial.println("========== Setup Complete ==========\n");
     
     // Initialize timing variables
     lastSensorRead = millis();
