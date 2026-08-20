@@ -19,8 +19,8 @@ SensorManager::SensorManager()
 
 void SensorManager::begin()
 {
-    // Initialize DHT22 (already initialized in main.cpp)
-    delay(2000); // Wait for DHT to stabilize
+    // Wait for DHT to stabilize
+    delay(2000);
     
     // Initialize RS485 Serial communication
     Serial2.begin(9600, SERIAL_8N1, RS485_RX, RS485_TX);
@@ -46,9 +46,9 @@ bool SensorManager::readSensors()
     float temperature = NAN;
     uint8_t retries = 3;
     
-    while (retries > 0 && (isnan(humidity) || isnan(temperature))) {
-        humidity = dht.readHumidity();
-        temperature = dht.readTemperature();
+    while (retries > 0) {
+        humidity = dht.readHumidity(false);  // false = no forced read
+        temperature = dht.readTemperature(false);
         
         if (!isnan(humidity) && !isnan(temperature)) {
             break; // Success
@@ -56,33 +56,39 @@ bool SensorManager::readSensors()
         
         retries--;
         if (retries > 0) {
-            delay(1000); // Wait before retry
+            delay(500);
         }
     }
     
     if (isnan(humidity) || isnan(temperature))
     {
-        Serial.printf("[SensorManager] ERROR: Failed to read DHT22 sensor! Humidity=%.1f, Temp=%.1f\n", humidity, temperature);
-        // Keep previous values
-        return false;
+        Serial.printf("[SensorManager] WARNING: DHT22 read failed (Humidity=%.1f, Temp=%.1f)\n", humidity, temperature);
+        // Set default values to avoid breaking Home Assistant
+        if (isnan(currentSnapshot.airTemp)) {
+            currentSnapshot.airTemp = 25.0f;
+        }
+        if (isnan(currentSnapshot.airHumidity)) {
+            currentSnapshot.airHumidity = 50.0f;
+        }
+        return true;  // Return true so MQTT still publishes
     }
     
     // Validate readings
     if (temperature < -40 || temperature > 80) {
-        Serial.printf("[SensorManager] ERROR: Invalid temperature: %.1f°C\n", temperature);
-        return false;
+        Serial.printf("[SensorManager] WARNING: Invalid temperature: %.1f°C\n", temperature);
+        return true;  // Still publish
     }
     
     if (humidity < 0 || humidity > 100) {
-        Serial.printf("[SensorManager] ERROR: Invalid humidity: %.1f%%\n", humidity);
-        return false;
+        Serial.printf("[SensorManager] WARNING: Invalid humidity: %.1f%%\n", humidity);
+        return true;  // Still publish
     }
     
     currentSnapshot.airHumidity = humidity;
     currentSnapshot.airTemp = temperature;
     currentSnapshot.timestamp = now;
     
-    Serial.printf("[SensorManager] DHT22 OK: Temp=%.1f°C, Humidity=%.1f%%\n", temperature, humidity);
+    Serial.printf("[SensorManager] DHT22: Temp=%.1f°C, Humidity=%.1f%%\n", temperature, humidity);
     
     // Read RS485 sensors
     readRS485Sensors();
@@ -93,19 +99,20 @@ bool SensorManager::readSensors()
 void SensorManager::readRS485Sensors()
 {
     // Send read request to RS485 sensor
-    // This is a simplified implementation - adjust based on your actual sensor protocol
-    
     digitalWrite(RS485_DE, HIGH); // Transmit mode
     delay(10);
     
-    // Example: Send request to sensor
+    // Send Modbus RTU request
     uint8_t request[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x08, 0x44, 0x09};
     Serial2.write(request, sizeof(request));
+    Serial2.flush();
     
     delay(100);
     digitalWrite(RS485_DE, LOW); // Receive mode
     
-    // Read response
+    // Wait for response
+    delay(100);
+    
     if (Serial2.available())
     {
         uint8_t response[19];
@@ -113,7 +120,7 @@ void SensorManager::readRS485Sensors()
         
         if (bytesRead == 19)
         {
-            // Parse sensor data (adjust based on actual sensor protocol)
+            // Parse sensor data
             currentSnapshot.soilMoisture = (response[3] << 8 | response[4]) / 10.0f;
             currentSnapshot.soilTemp = (response[5] << 8 | response[6]) / 10.0f;
             currentSnapshot.ph = (response[7] << 8 | response[8]) / 10.0f;
@@ -122,18 +129,18 @@ void SensorManager::readRS485Sensors()
             currentSnapshot.phosphorus = (response[13] << 8 | response[14]);
             currentSnapshot.potassium = (response[15] << 8 | response[16]);
             
-            Serial.printf("[SensorManager] Soil: Moisture=%.1f%% Temp=%.1f°C pH=%.1f EC=%u\n",
+            Serial.printf("[SensorManager] RS485 OK: Moisture=%.1f%% Temp=%.1f°C pH=%.1f EC=%u\n",
                          currentSnapshot.soilMoisture, currentSnapshot.soilTemp,
                          currentSnapshot.ph, currentSnapshot.ec);
         }
         else
         {
-            Serial.printf("[SensorManager] WARNING: Invalid RS485 response size: %d bytes\n", bytesRead);
+            Serial.printf("[SensorManager] RS485 response: %d bytes\n", bytesRead);
         }
     }
     else
     {
-        Serial.println("[SensorManager] WARNING: No data from RS485 sensor");
+        Serial.println("[SensorManager] RS485: No response");
     }
 }
 
