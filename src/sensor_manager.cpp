@@ -3,7 +3,7 @@
 #include <DHT.h>
 #include <HardwareSerial.h>
 
-// Declare as extern - defined in smartgarden.ino
+// Declare as extern - defined in main.cpp
 extern DHT dht;
 
 // RS485 Serial (Serial2 on ESP32)
@@ -14,11 +14,13 @@ extern DHT dht;
 SensorManager::SensorManager()
     : lastReadTime(0), readInterval(5000)
 {
+    memset(&currentSnapshot, 0, sizeof(SensorSnapshot));
 }
 
 void SensorManager::begin()
 {
-    // Initialize DHT22 (already initialized in smartgarden.ino)
+    // Initialize DHT22 (already initialized in main.cpp)
+    delay(2000); // Wait for DHT to stabilize
     
     // Initialize RS485 Serial communication
     Serial2.begin(9600, SERIAL_8N1, RS485_RX, RS485_TX);
@@ -39,19 +41,48 @@ bool SensorManager::readSensors()
     }
     lastReadTime = now;
     
-    // Read DHT22
-    float humidity = dht.readHumidity();
-    float temperature = dht.readTemperature();
+    // Read DHT22 with retries
+    float humidity = NAN;
+    float temperature = NAN;
+    uint8_t retries = 3;
+    
+    while (retries > 0 && (isnan(humidity) || isnan(temperature))) {
+        humidity = dht.readHumidity();
+        temperature = dht.readTemperature();
+        
+        if (!isnan(humidity) && !isnan(temperature)) {
+            break; // Success
+        }
+        
+        retries--;
+        if (retries > 0) {
+            delay(1000); // Wait before retry
+        }
+    }
     
     if (isnan(humidity) || isnan(temperature))
     {
-        Serial.println("[SensorManager] ERROR: Failed to read DHT22 sensor!");
+        Serial.printf("[SensorManager] ERROR: Failed to read DHT22 sensor! Humidity=%.1f, Temp=%.1f\n", humidity, temperature);
+        // Keep previous values
+        return false;
+    }
+    
+    // Validate readings
+    if (temperature < -40 || temperature > 80) {
+        Serial.printf("[SensorManager] ERROR: Invalid temperature: %.1f°C\n", temperature);
+        return false;
+    }
+    
+    if (humidity < 0 || humidity > 100) {
+        Serial.printf("[SensorManager] ERROR: Invalid humidity: %.1f%%\n", humidity);
         return false;
     }
     
     currentSnapshot.airHumidity = humidity;
     currentSnapshot.airTemp = temperature;
     currentSnapshot.timestamp = now;
+    
+    Serial.printf("[SensorManager] DHT22 OK: Temp=%.1f°C, Humidity=%.1f%%\n", temperature, humidity);
     
     // Read RS485 sensors
     readRS485Sensors();
@@ -97,7 +128,7 @@ void SensorManager::readRS485Sensors()
         }
         else
         {
-            Serial.println("[SensorManager] ERROR: Invalid RS485 response size");
+            Serial.printf("[SensorManager] WARNING: Invalid RS485 response size: %d bytes\n", bytesRead);
         }
     }
     else
