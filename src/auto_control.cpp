@@ -1,4 +1,5 @@
 #include "auto_control.h"
+#include "app_config.h"
 #include <Arduino.h>
 
 void AutoControlSystem::addCommand(CommandQueue& queue, uint8_t relayIndex, bool state)
