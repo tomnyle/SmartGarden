@@ -18,6 +18,11 @@
 WiFiClient espClient;
 PubSubClient pubsubClient(espClient);
 
+// DHT Sensor
+#define DHT_PIN 4
+#define DHT_TYPE DHT22
+DHT dht(DHT_PIN, DHT_TYPE);
+
 SensorManager sensorManager;
 MQTTService mqttService(MQTT_BROKER, MQTT_PORT);
 NetworkService networkService(WIFI_SSID, WIFI_PASSWORD);
@@ -76,6 +81,10 @@ void setup()
     
     // Record system start time
     systemStartTime = millis();
+    
+    // Initialize DHT sensor
+    Serial.println("[Setup] Initializing DHT22 sensor...");
+    dht.begin();
     
     // Initialize relay manager
     Serial.println("[Setup] Initializing relay manager...");
