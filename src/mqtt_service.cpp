@@ -15,6 +15,7 @@ void mqttMessageCallback(char* topic, byte* payload, unsigned int length) {
 MQTTService::MQTTService(const char* broker, int port)
     : client(nullptr), mqttBroker(broker), mqttPort(port), connected(false),
       lastPublishTime(0), publishInterval(5000), lastDiscoveryTime(0),
+      lastRetryTime(0), retryInterval(3000),
       relayCallback(nullptr), cropCallback(nullptr)
 {
     strncpy(deviceId, "SmartGarden_", sizeof(deviceId) - 1);
@@ -91,8 +92,15 @@ void MQTTService::loop()
     
     if (!client->connected())
     {
-        if (millis() % 5000 == 0) {
-            connect();
+        unsigned long now = millis();
+        if (now - lastRetryTime >= retryInterval) {
+            lastRetryTime = now;
+            Serial.printf("[MQTTService] Retrying connection (interval=%lums)...\n", retryInterval);
+            if (connect()) {
+                retryInterval = 3000;
+            } else {
+                retryInterval = min(retryInterval * 2, (unsigned long)60000);
+            }
         }
     }
     else

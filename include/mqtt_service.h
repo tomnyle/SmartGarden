@@ -54,6 +54,8 @@ private:
     unsigned long lastPublishTime;
     unsigned long publishInterval;
     unsigned long lastDiscoveryTime;
+    unsigned long lastRetryTime;
+    unsigned long retryInterval;
     
     // Callbacks
     RelayCommandCallback relayCallback;
