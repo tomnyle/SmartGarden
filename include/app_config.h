@@ -12,10 +12,11 @@
 #define WIFI_PASSWORD "123456789"
 #define WIFI_TIMEOUT 20000
 
-#define MQTT_BROKER "test.mosquitto.org"
+// Home Assistant MQTT Broker
+#define MQTT_BROKER "192.168.100.168"
 #define MQTT_PORT 1883
-#define MQTT_USERNAME ""
-#define MQTT_PASSWORD ""
+#define MQTT_USERNAME "homer"
+#define MQTT_PASSWORD "Danh@@@1992"
 #define MQTT_RECONNECT_INTERVAL 5000
 
 #define SENSOR_READ_INTERVAL 5000
