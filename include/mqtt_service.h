@@ -14,21 +14,18 @@ typedef void (*CropSelectCallback)(const char* cropName);
 class MQTTService {
 public:
     MQTTService(const char* broker, int port);
-    
+
     void begin(const char* username, const char* password);
     void setClient(PubSubClient* client);
-    
-    // Connection management
+
     bool connect();
     bool isConnected() const;
-    void loop();  // Must be called frequently
-    
-    // Callback setters
+    void loop();
+
     void setRelayCommandCallback(RelayCommandCallback callback);
     void setCropSelectCallback(CropSelectCallback callback);
-    
-    // Publishing functions
-    bool publish(const char* topic, const char* payload);
+
+    bool publish(const char* topic, const char* payload, bool retained = true);
     bool publishSensorData(const SensorSnapshot& snapshot);
     bool publishRelayStatus(uint8_t relayIndex, bool state);
     bool publishAllRelayStatus(const RelayManager* relayMgr);
@@ -36,13 +33,11 @@ public:
     bool publishCurrentCrop(const CropProfile* profile);
     bool publishStatus(const char* status);
     bool publishUptime(unsigned long uptime);
-    
-    // Home Assistant MQTT Discovery
+
     void publishDiscoveryMessages();
-    
-    // Get device ID
+
     const char* getDeviceId() const { return deviceId; }
-    
+
 private:
     PubSubClient* client;
     const char* mqttBroker;
@@ -54,16 +49,16 @@ private:
     unsigned long lastPublishTime;
     unsigned long publishInterval;
     unsigned long lastDiscoveryTime;
-    
-    // Callbacks
+    unsigned long lastReconnectAttempt;
+    unsigned long reconnectDelay;
+    unsigned long maxReconnectDelay;
+
     RelayCommandCallback relayCallback;
     CropSelectCallback cropCallback;
-    
-    // Callback for received messages
+
     void onMessageReceived(char* topic, byte* payload, unsigned int length);
     friend void mqttMessageCallback(char* topic, byte* payload, unsigned int length);
-    
-    // Helper functions
+
     void subscribeToTopics();
     void handleRelayCommand(const char* relayName, const char* payload);
     void handleCropSelect(const char* payload);
