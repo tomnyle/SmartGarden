@@ -3,29 +3,20 @@
 
 #include <Arduino.h>
 #include <PubSubClient.h>
-#include "garden_profile.h"
 
-extern PubSubClient client;
-
-// Forward declarations for publish functions
-void publishCurrentCropConfig();
-void publishCropList();
-
-// Publish current active crop configuration to MQTT
-inline void publishCurrentCropConfig()
+inline String buildSmartGardenTopic(const char* deviceId, const char* suffix)
 {
-    // Publish status
-    client.publish("smartgarden/system/status", "online", true);
+    return String("smartgarden/") + String(deviceId ? deviceId : "unknown") + "/" + String(suffix ? suffix : "");
 }
 
-// Publish list of available crops to MQTT
-inline void publishCropList()
+inline bool publishRetained(PubSubClient& client, const char* deviceId, const char* suffix, const char* payload)
 {
-    // Get available crops (simplified)
-    char buffer[128];
-    snprintf(buffer, sizeof(buffer), "Smart Garden Ready - %u crops available", 13);
-    client.publish("smartgarden/status", buffer, true);
-    client.publish("smartgarden/system/status", "online", true);
+    if (!client.connected() || !suffix || !payload) {
+        return false;
+    }
+
+    String topic = buildSmartGardenTopic(deviceId, suffix);
+    return client.publish(topic.c_str(), payload, true);
 }
 
 #endif

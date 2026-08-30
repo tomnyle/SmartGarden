@@ -4,7 +4,10 @@
 #include "app_config.h"
 #include "pins.h"
 
-// System configuration
+#define SMARTGARDEN_TOPIC_PREFIX "smartgarden"
+#define SMARTGARDEN_MAX_RELAYS 8
+#define SMARTGARDEN_MAX_CROPS 13
+
 typedef struct {
     char deviceName[32];
     char wifiSSID[64];
@@ -18,16 +21,9 @@ typedef struct {
     uint32_t publishInterval;
 } SystemConfig;
 
-// Get default system configuration
 SystemConfig getDefaultConfig();
-
-// Load configuration from EEPROM
 bool loadConfig(SystemConfig& config);
-
-// Save configuration to EEPROM
 bool saveConfig(const SystemConfig& config);
-
-// Print configuration to serial
 void printConfig(const SystemConfig& config);
 
 #endif // CONFIG_H
