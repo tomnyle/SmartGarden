@@ -7,6 +7,22 @@
 
 static MQTTService* g_mqttService = nullptr;
 
+static String escapeJson(const char* input) {
+    if (!input) {
+        return "";
+    }
+
+    String out;
+    while (*input) {
+        if (*input == '\\' || *input == '\"') {
+            out += '\\';
+        }
+        out += *input;
+        input++;
+    }
+    return out;
+}
+
 void mqttMessageCallback(char* topic, byte* payload, unsigned int length) {
     if (g_mqttService) {
         g_mqttService->onMessageReceived(topic, payload, length);
@@ -129,14 +145,14 @@ void MQTTService::loop()
     client->loop();
 }
 
-bool MQTTService::publish(const char* topic, const char* payload)
+bool MQTTService::publish(const char* topic, const char* payload, bool retained)
 {
     if (!client || !client->connected() || !topic || !payload) {
         return false;
     }
 
     String fullTopic = String("smartgarden/") + deviceId + "/" + topic;
-    return client->publish(fullTopic.c_str(), payload, true);
+    return client->publish(fullTopic.c_str(), payload, retained);
 }
 
 bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
@@ -153,31 +169,31 @@ bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
 
     char payload[32];
     snprintf(payload, sizeof(payload), "%.1f", snapshot.airTemp);
-    publish("sensors/air_temperature", payload);
+    publish("sensors/air_temperature", payload, false);
 
     snprintf(payload, sizeof(payload), "%.1f", snapshot.airHumidity);
-    publish("sensors/air_humidity", payload);
+    publish("sensors/air_humidity", payload, false);
 
     snprintf(payload, sizeof(payload), "%.1f", snapshot.soilMoisture);
-    publish("sensors/soil_moisture", payload);
+    publish("sensors/soil_moisture", payload, false);
 
     snprintf(payload, sizeof(payload), "%.1f", snapshot.soilTemp);
-    publish("sensors/soil_temperature", payload);
+    publish("sensors/soil_temperature", payload, false);
 
     snprintf(payload, sizeof(payload), "%.1f", snapshot.ph);
-    publish("sensors/ph", payload);
+    publish("sensors/ph", payload, false);
 
     snprintf(payload, sizeof(payload), "%u", snapshot.ec);
-    publish("sensors/ec", payload);
+    publish("sensors/ec", payload, false);
 
     snprintf(payload, sizeof(payload), "%u", snapshot.nitrogen);
-    publish("sensors/nitrogen", payload);
+    publish("sensors/nitrogen", payload, false);
 
     snprintf(payload, sizeof(payload), "%u", snapshot.phosphorus);
-    publish("sensors/phosphorus", payload);
+    publish("sensors/phosphorus", payload, false);
 
     snprintf(payload, sizeof(payload), "%u", snapshot.potassium);
-    publish("sensors/potassium", payload);
+    publish("sensors/potassium", payload, false);
 
     return true;
 }
@@ -212,7 +228,6 @@ bool MQTTService::publishCropList()
         return false;
     }
 
-    CropProfileStore::initialize();
     uint8_t count = 0;
     const CropProfile* crops = CropProfileStore::getAllCrops(count);
 
@@ -222,7 +237,7 @@ bool MQTTService::publishCropList()
             payload += ",";
         }
         payload += "\"";
-        payload += crops[i].name;
+        payload += escapeJson(crops[i].name);
         payload += "\"";
     }
     payload += "]";
@@ -250,7 +265,7 @@ bool MQTTService::publishUptime(unsigned long uptime)
 {
     char payload[32];
     snprintf(payload, sizeof(payload), "%lu", uptime / 1000UL);
-    return publish("uptime", payload);
+    return publish("uptime", payload, false);
 }
 
 void MQTTService::subscribeToTopics()
@@ -401,7 +416,6 @@ void MQTTService::publishDiscoveryMessages()
         client->publish(configTopic.c_str(), payload.c_str(), true);
     }
 
-    CropProfileStore::initialize();
     uint8_t cropCount = 0;
     const CropProfile* crops = CropProfileStore::getAllCrops(cropCount);
 
@@ -410,7 +424,7 @@ void MQTTService::publishDiscoveryMessages()
         if (i > 0) {
             options += ",";
         }
-        options += "\"" + String(crops[i].name) + "\"";
+        options += "\"" + escapeJson(crops[i].name) + "\"";
     }
     options += "]";
 

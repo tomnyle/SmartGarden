@@ -108,7 +108,9 @@ void loop()
     if (sensorManager.readSensors()) {
         const SensorSnapshot& snapshot = sensorManager.getSnapshot();
         climateManager.control(snapshot);
-        zoneManager.controlZone(1, snapshot, &climateManager);
+        for (uint8_t zoneId = 1; zoneId <= zoneManager.getZoneCount(); zoneId++) {
+            zoneManager.controlZone(zoneId, snapshot, &climateManager);
+        }
 
         if (mqttService) {
             mqttService->publishSensorData(snapshot);

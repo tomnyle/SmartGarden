@@ -25,7 +25,7 @@ public:
     void setRelayCommandCallback(RelayCommandCallback callback);
     void setCropSelectCallback(CropSelectCallback callback);
 
-    bool publish(const char* topic, const char* payload);
+    bool publish(const char* topic, const char* payload, bool retained = true);
     bool publishSensorData(const SensorSnapshot& snapshot);
     bool publishRelayStatus(uint8_t relayIndex, bool state);
     bool publishAllRelayStatus(const RelayManager* relayMgr);

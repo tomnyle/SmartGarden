@@ -6,12 +6,15 @@
 
 inline String buildSmartGardenTopic(const char* deviceId, const char* suffix)
 {
-    return String("smartgarden/") + String(deviceId ? deviceId : "unknown") + "/" + String(suffix ? suffix : "");
+    if (!deviceId || !suffix) {
+        return String();
+    }
+    return String("smartgarden/") + String(deviceId) + "/" + String(suffix);
 }
 
 inline bool publishRetained(PubSubClient& client, const char* deviceId, const char* suffix, const char* payload)
 {
-    if (!client.connected() || !suffix || !payload) {
+    if (!client.connected() || !deviceId || !suffix || !payload) {
         return false;
     }
 
