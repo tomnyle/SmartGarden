@@ -23,6 +23,7 @@ ModbusMaster node;
 // RELAY
 #define RELAY_COUNT 8
 int relayPins[RELAY_COUNT] = {5, 18, 19, 27, 32, 33, 25, 26};
+const char* relayNames[RELAY_COUNT] = {"Fan", "Heater", "Cooler", "Humidifier", "Dehumidifier", "Irrigation", "Relay7", "Relay8"};
 bool relayState[RELAY_COUNT] = {false};
 
 // WiFi config
@@ -30,10 +31,14 @@ const char* ssid = "Le Danh";
 const char* password = "123456789";
 
 // MQTT config
-const char* mqtt_server = "192.168.100.166";
+const char* mqtt_server = "192.168.100.168";
 const int mqtt_port = 1883;
 const char* mqtt_user = "homer";
 const char* mqtt_password = "Danh@@@1992";
+
+const char* deviceId = "SmartGarden_ESP32";
+const char* deviceName = "smartgarden";
+const char* discoveryPrefix = "homeassistant";
 
 // ================= RS485 CONTROL =================
 void preTransmission() {
@@ -76,13 +81,103 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 }
 
+// ================= PUBLISH DISCOVERY MESSAGES =================
+void publishDiscoveryMessages() {
+    Serial.println("[MQTT Discovery] Publishing Home Assistant discovery...");
+    
+    char buffer[1024];
+    String device = R"(,"device":{"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32","name":"Smart Garden"})";
+    
+    // ===== SENSORS =====
+    
+    // Air Temperature
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"SmartGarden Air Temperature\",\"unique_id\":\"smartgarden_air_temp\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"unit_of_measurement\":\"°C\",\"device_class\":\"temperature\",\"state_class\":\"measurement\"%s}",
+        device.c_str());
+    client.publish((String(discoveryPrefix) + "/sensor/" + deviceName + "/smartgarden_air_temp/config").c_str(), buffer, true);
+    delay(50);
+    
+    // Air Humidity
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"SmartGarden Air Humidity\",\"unique_id\":\"smartgarden_air_humidity\",\"state_topic\":\"smartgarden/sensors/air_humidity\",\"unit_of_measurement\":\"%%\",\"device_class\":\"humidity\",\"state_class\":\"measurement\"%s}",
+        device.c_str());
+    client.publish((String(discoveryPrefix) + "/sensor/" + deviceName + "/smartgarden_air_humidity/config").c_str(), buffer, true);
+    delay(50);
+    
+    // Soil Moisture
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"SmartGarden Soil Moisture\",\"unique_id\":\"smartgarden_soil_moisture\",\"state_topic\":\"smartgarden/sensors/soil_moisture\",\"unit_of_measurement\":\"%%\",\"device_class\":\"moisture\",\"state_class\":\"measurement\"%s}",
+        device.c_str());
+    client.publish((String(discoveryPrefix) + "/sensor/" + deviceName + "/smartgarden_soil_moisture/config").c_str(), buffer, true);
+    delay(50);
+    
+    // Soil Temperature
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"SmartGarden Soil Temperature\",\"unique_id\":\"smartgarden_soil_temp\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"unit_of_measurement\":\"°C\",\"device_class\":\"temperature\",\"state_class\":\"measurement\"%s}",
+        device.c_str());
+    client.publish((String(discoveryPrefix) + "/sensor/" + deviceName + "/smartgarden_soil_temp/config").c_str(), buffer, true);
+    delay(50);
+    
+    // pH
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"SmartGarden pH\",\"unique_id\":\"smartgarden_ph\",\"state_topic\":\"smartgarden/sensors/ph\",\"unit_of_measurement\":\"pH\",\"device_class\":\"ph\",\"state_class\":\"measurement\"%s}",
+        device.c_str());
+    client.publish((String(discoveryPrefix) + "/sensor/" + deviceName + "/smartgarden_ph/config").c_str(), buffer, true);
+    delay(50);
+    
+    // EC
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"SmartGarden EC\",\"unique_id\":\"smartgarden_ec\",\"state_topic\":\"smartgarden/sensors/ec\",\"unit_of_measurement\":\"µS/cm\",\"state_class\":\"measurement\"%s}",
+        device.c_str());
+    client.publish((String(discoveryPrefix) + "/sensor/" + deviceName + "/smartgarden_ec/config").c_str(), buffer, true);
+    delay(50);
+    
+    // Nitrogen
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"SmartGarden Nitrogen\",\"unique_id\":\"smartgarden_nitrogen\",\"state_topic\":\"smartgarden/sensors/nitrogen\",\"unit_of_measurement\":\"mg/kg\",\"state_class\":\"measurement\"%s}",
+        device.c_str());
+    client.publish((String(discoveryPrefix) + "/sensor/" + deviceName + "/smartgarden_nitrogen/config").c_str(), buffer, true);
+    delay(50);
+    
+    // Phosphorus
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"SmartGarden Phosphorus\",\"unique_id\":\"smartgarden_phosphorus\",\"state_topic\":\"smartgarden/sensors/phosphorus\",\"unit_of_measurement\":\"mg/kg\",\"state_class\":\"measurement\"%s}",
+        device.c_str());
+    client.publish((String(discoveryPrefix) + "/sensor/" + deviceName + "/smartgarden_phosphorus/config").c_str(), buffer, true);
+    delay(50);
+    
+    // Potassium
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"SmartGarden Potassium\",\"unique_id\":\"smartgarden_potassium\",\"state_topic\":\"smartgarden/sensors/potassium\",\"unit_of_measurement\":\"mg/kg\",\"state_class\":\"measurement\"%s}",
+        device.c_str());
+    client.publish((String(discoveryPrefix) + "/sensor/" + deviceName + "/smartgarden_potassium/config").c_str(), buffer, true);
+    delay(50);
+    
+    // ===== SWITCHES (RELAYS) =====
+    
+    for (int i = 0; i < RELAY_COUNT; i++) {
+        snprintf(buffer, sizeof(buffer),
+            "{\"name\":\"SmartGarden %s\",\"unique_id\":\"smartgarden_relay_%d\",\"state_topic\":\"smartgarden/relay/%d/state\",\"command_topic\":\"smartgarden/relay/%d/set\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\"%s}",
+            relayNames[i], i + 1, i + 1, i + 1, device.c_str());
+        
+        String switchTopic = String(discoveryPrefix) + "/switch/" + deviceName + "/smartgarden_relay_" + String(i + 1) + "/config";
+        client.publish(switchTopic.c_str(), buffer, true);
+        delay(50);
+    }
+    
+    Serial.println("[MQTT Discovery] ✓ All discovery messages published!");
+}
+
 // ================= MQTT RECONNECT =================
 void reconnect() {
     while (!client.connected()) {
         Serial.print("[MQTT] Connecting...");
         
-        if (client.connect("ESP32_SmartGarden", mqtt_user, mqtt_password)) {
+        if (client.connect(deviceId, mqtt_user, mqtt_password)) {
             Serial.println(" Connected!");
+            
+            // Publish discovery messages
+            publishDiscoveryMessages();
             
             // Subscribe to relay control topics
             for (int i = 0; i < RELAY_COUNT; i++) {
