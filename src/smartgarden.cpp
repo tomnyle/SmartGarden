@@ -276,26 +276,16 @@ void loop() {
     if (now - lastSensorRead >= SENSOR_READ_INTERVAL) {
         lastSensorRead = now;
         
-        // Read DHT22
-        float airTemp = dht.readTemperature();
-        float airHum = dht.readHumidity();
-        
-        // Read Modbus sensors
-        float moisture = 0, soilTemp = 0, ph = 0;
-        uint16_t ec = 0, n = 0, p = 0, k = 0;
-        
-        uint8_t result = node.readHoldingRegisters(0x0000, 40);
-        if (result == node.ku8MBSuccess) {
-            moisture = node.getResponseBuffer(0) / 10.0;
-            soilTemp = node.getResponseBuffer(1) / 10.0;
-            ph = node.getResponseBuffer(3) / 10.0;
-            n = node.getResponseBuffer(4);
-            p = node.getResponseBuffer(5);
-            k = node.getResponseBuffer(6);
-            ec = node.getResponseBuffer(9);
-        } else {
-            Serial.printf("[Modbus] Error code: %d\n", result);
-        }
+        // ===== FAKE DATA FOR TESTING (when sensors not connected) =====
+        float airTemp = 25.5;      // Fake temperature
+        float airHum = 60.0;       // Fake humidity
+        float moisture = 45.0;     // Fake soil moisture
+        float soilTemp = 22.0;     // Fake soil temperature
+        float ph = 6.8;            // Fake pH
+        uint16_t ec = 1200;        // Fake EC
+        uint16_t n = 150;          // Fake Nitrogen
+        uint16_t p = 80;           // Fake Phosphorus
+        uint16_t k = 120;          // Fake Potassium
         
         // Publish sensor data to MQTT
         if (client.connected()) {
@@ -311,7 +301,7 @@ void loop() {
         }
         
         // Print to serial
-        Serial.println("\n========== SENSOR DATA ==========");
+        Serial.println("\n========== SENSOR DATA (FAKE) ==========");
         Serial.printf("Air Temp     : %.1f °C\n", airTemp);
         Serial.printf("Air Humidity : %.1f %%\n", airHum);
         Serial.printf("Soil Moisture: %.1f %%\n", moisture);
