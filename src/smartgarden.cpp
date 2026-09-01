@@ -98,11 +98,11 @@ void publishDiscoveryMessages() {
     
     // Air Temperature
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Temperature\",\"unique_id\":\"smartgarden_air_temp\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"unit_of_measurement\":\"°C\",\"device_class\":\"temperature\",\"state_class\":\"measurement\"%s}",
+        "{\"name\":\"Air Temperature\",\"unique_id\":\"smartgarden_air_temp\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"unit_of_measurement\":\"C\",\"device_class\":\"temperature\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
     client.publish((String(discoveryPrefix) + "/sensor/smartgarden_air_temp/config").c_str(), buffer, true);
     delay(100);
-    Serial.println("  ✓ Air Temperature");
+    Serial.println("  OK Air Temperature");
     
     // Air Humidity
     snprintf(buffer, sizeof(buffer),
@@ -110,7 +110,7 @@ void publishDiscoveryMessages() {
         deviceInfo);
     client.publish((String(discoveryPrefix) + "/sensor/smartgarden_air_humidity/config").c_str(), buffer, true);
     delay(100);
-    Serial.println("  ✓ Air Humidity");
+    Serial.println("  OK Air Humidity");
     
     // Soil Moisture
     snprintf(buffer, sizeof(buffer),
@@ -118,15 +118,15 @@ void publishDiscoveryMessages() {
         deviceInfo);
     client.publish((String(discoveryPrefix) + "/sensor/smartgarden_soil_moisture/config").c_str(), buffer, true);
     delay(100);
-    Serial.println("  ✓ Soil Moisture");
+    Serial.println("  OK Soil Moisture");
     
     // Soil Temperature
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Temperature\",\"unique_id\":\"smartgarden_soil_temp\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"unit_of_measurement\":\"°C\",\"device_class\":\"temperature\",\"state_class\":\"measurement\"%s}",
+        "{\"name\":\"Soil Temperature\",\"unique_id\":\"smartgarden_soil_temp\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"unit_of_measurement\":\"C\",\"device_class\":\"temperature\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
     client.publish((String(discoveryPrefix) + "/sensor/smartgarden_soil_temp/config").c_str(), buffer, true);
     delay(100);
-    Serial.println("  ✓ Soil Temperature");
+    Serial.println("  OK Soil Temperature");
     
     // pH
     snprintf(buffer, sizeof(buffer),
@@ -134,15 +134,15 @@ void publishDiscoveryMessages() {
         deviceInfo);
     client.publish((String(discoveryPrefix) + "/sensor/smartgarden_ph/config").c_str(), buffer, true);
     delay(100);
-    Serial.println("  ✓ pH Value");
+    Serial.println("  OK pH Value");
     
     // EC
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"EC\",\"unique_id\":\"smartgarden_ec\",\"state_topic\":\"smartgarden/sensors/ec\",\"unit_of_measurement\":\"µS/cm\",\"state_class\":\"measurement\"%s}",
+        "{\"name\":\"EC\",\"unique_id\":\"smartgarden_ec\",\"state_topic\":\"smartgarden/sensors/ec\",\"unit_of_measurement\":\"uS/cm\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
     client.publish((String(discoveryPrefix) + "/sensor/smartgarden_ec/config").c_str(), buffer, true);
     delay(100);
-    Serial.println("  ✓ EC");
+    Serial.println("  OK EC");
     
     // Nitrogen
     snprintf(buffer, sizeof(buffer),
@@ -150,7 +150,7 @@ void publishDiscoveryMessages() {
         deviceInfo);
     client.publish((String(discoveryPrefix) + "/sensor/smartgarden_nitrogen/config").c_str(), buffer, true);
     delay(100);
-    Serial.println("  ✓ Nitrogen");
+    Serial.println("  OK Nitrogen");
     
     // Phosphorus
     snprintf(buffer, sizeof(buffer),
@@ -158,7 +158,7 @@ void publishDiscoveryMessages() {
         deviceInfo);
     client.publish((String(discoveryPrefix) + "/sensor/smartgarden_phosphorus/config").c_str(), buffer, true);
     delay(100);
-    Serial.println("  ✓ Phosphorus");
+    Serial.println("  OK Phosphorus");
     
     // Potassium
     snprintf(buffer, sizeof(buffer),
@@ -166,7 +166,7 @@ void publishDiscoveryMessages() {
         deviceInfo);
     client.publish((String(discoveryPrefix) + "/sensor/smartgarden_potassium/config").c_str(), buffer, true);
     delay(100);
-    Serial.println("  ✓ Potassium");
+    Serial.println("  OK Potassium");
     
     // ===== SWITCHES (RELAYS) =====
     
@@ -178,10 +178,10 @@ void publishDiscoveryMessages() {
         String switchTopic = String(discoveryPrefix) + "/switch/smartgarden_relay_" + String(i + 1) + "/config";
         client.publish(switchTopic.c_str(), buffer, true);
         delay(100);
-        Serial.printf("  ✓ Relay %d: %s\n", i + 1, relayNames[i]);
+        Serial.printf("  OK Relay %d: %s\n", i + 1, relayNames[i]);
     }
     
-    Serial.println("[MQTT Discovery] ✓ All discovery messages published!\n");
+    Serial.println("[MQTT Discovery] All discovery messages published!\n");
     discoveryPublished = true;
 }
 
@@ -191,7 +191,7 @@ void reconnect() {
         Serial.print("[MQTT] Connecting...");
         
         if (client.connect(deviceId, mqtt_user, mqtt_password)) {
-            Serial.println(" ✓ Connected!");
+            Serial.println(" Connected!");
             
             // Publish discovery messages
             publishDiscoveryMessages();
@@ -207,7 +207,7 @@ void reconnect() {
                 setRelay(i, relayState[i]);
             }
         } else {
-            Serial.printf(" ✗ Failed (code=%d), retry in 3s\n", client.state());
+            Serial.printf(" Failed (code=%d), retry in 3s\n", client.state());
             delay(3000);
         }
     }
@@ -227,12 +227,12 @@ void setup() {
         digitalWrite(relayPins[i], HIGH);
         relayState[i] = false;
     }
-    Serial.println("[Setup] ✓ Relays initialized");
+    Serial.println("[Setup] Relays initialized");
     
     // Initialize DHT22
     Serial.println("[Setup] Initializing DHT22...");
     dht.begin();
-    Serial.println("[Setup] ✓ DHT22 initialized");
+    Serial.println("[Setup] DHT22 initialized");
     
     // Initialize RS485
     Serial.println("[Setup] Initializing RS485...");
@@ -242,7 +242,7 @@ void setup() {
     node.begin(1, RS485Serial);
     node.preTransmission(preTransmission);
     node.postTransmission(postTransmission);
-    Serial.println("[Setup] ✓ RS485 initialized");
+    Serial.println("[Setup] RS485 initialized");
     
     // Connect WiFi
     Serial.printf("[Setup] Connecting to WiFi: %s\n", ssid);
@@ -256,10 +256,10 @@ void setup() {
     Serial.println();
     
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.print("[WiFi] ✓ Connected! IP: ");
+        Serial.print("[WiFi] Connected! IP: ");
         Serial.println(WiFi.localIP());
     } else {
-        Serial.println("[WiFi] ✗ Failed to connect!");
+        Serial.println("[WiFi] Failed to connect!");
     }
     
     // Setup MQTT
@@ -320,12 +320,12 @@ void loop() {
         
         // Print to serial
         Serial.println("\n========== SENSOR DATA (FAKE) ==========");
-        Serial.printf("Air Temp     : %.1f °C\n", airTemp);
+        Serial.printf("Air Temp     : %.1f C\n", airTemp);
         Serial.printf("Air Humidity : %.1f %%\n", airHum);
         Serial.printf("Soil Moisture: %.1f %%\n", moisture);
-        Serial.printf("Soil Temp    : %.1f °C\n", soilTemp);
+        Serial.printf("Soil Temp    : %.1f C\n", soilTemp);
         Serial.printf("pH           : %.1f\n", ph);
-        Serial.printf("EC           : %u µS/cm\n", ec);
+        Serial.printf("EC           : %u uS/cm\n", ec);
         Serial.printf("Nitrogen     : %u mg/kg\n", n);
         Serial.printf("Phosphorus   : %u mg/kg\n", p);
         Serial.printf("Potassium    : %u mg/kg\n", k);
