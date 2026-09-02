@@ -317,8 +317,9 @@ bool reconnect() {
         return true;
     }
 
-    Serial.printf(" Failed (code=%d), next retry in %lus\n", client.state(), mqttReconnectDelay / 1000);
-    mqttReconnectDelay = min(mqttReconnectDelay * 2, MQTT_MAX_RECONNECT_DELAY);
+    unsigned long nextReconnectDelay = min(mqttReconnectDelay * 2, MQTT_MAX_RECONNECT_DELAY);
+    Serial.printf(" Failed (code=%d), next retry in %lus\n", client.state(), nextReconnectDelay / 1000);
+    mqttReconnectDelay = nextReconnectDelay;
     mqttWasConnected = false;
     return false;
 }
