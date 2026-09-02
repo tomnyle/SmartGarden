@@ -172,7 +172,7 @@ void publishDiscoveryMessages() {
     
     for (int i = 0; i < RELAY_COUNT; i++) {
         snprintf(buffer, sizeof(buffer),
-            "{\"name\":\"%s\",\"unique_id\":\"smartgarden_relay_%d\",\"state_topic\":\"smartgarden/relay/%d/state\",\"command_topic\":\"smartgarden/relay/%d/set\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\"%s}",
+            "{\"name\":\"%s\",\"unique_id\":\"smartgarden_relay_%d\",\"state_topic\":\"smartgarden/relay/%d/state\",\"command_topic\":\"smartgarden/relay/%d/set\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"device_class\":\"switch\"%s}",
             relayNames[i], i + 1, i + 1, i + 1, deviceInfo);
         
         String switchTopic = String(discoveryPrefix) + "/switch/smartgarden_relay_" + String(i + 1) + "/config";
@@ -294,16 +294,30 @@ void loop() {
     if (now - lastSensorRead >= SENSOR_READ_INTERVAL) {
         lastSensorRead = now;
         
-        // ===== FAKE DATA FOR TESTING (when sensors not connected) =====
-        float airTemp = 25.5;      // Fake temperature
-        float airHum = 60.0;       // Fake humidity
-        float moisture = 45.0;     // Fake soil moisture
-        float soilTemp = 22.0;     // Fake soil temperature
-        float ph = 6.8;            // Fake pH
-        uint16_t ec = 1200;        // Fake EC
-        uint16_t n = 150;          // Fake Nitrogen
-        uint16_t p = 80;           // Fake Phosphorus
-        uint16_t k = 120;          // Fake Potassium
+        // ===== READ REAL SENSOR DATA =====
+        
+        // Read DHT22 (real data)
+        float airTemp = dht.readTemperature();
+        float airHum = dht.readHumidity();
+        
+        // Handle DHT read errors
+        if (isnan(airTemp)) {
+            airTemp = 0;
+            Serial.println("[Sensor] DHT22 Temperature read failed!");
+        }
+        if (isnan(airHum)) {
+            airHum = 0;
+            Serial.println("[Sensor] DHT22 Humidity read failed!");
+        }
+        
+        // Other sensors = 0 (waiting for hardware to be connected)
+        float moisture = 0.0;
+        float soilTemp = 0.0;
+        float ph = 0.0;
+        uint16_t ec = 0;
+        uint16_t n = 0;
+        uint16_t p = 0;
+        uint16_t k = 0;
         
         // Publish sensor data to MQTT
         if (client.connected()) {
@@ -319,16 +333,16 @@ void loop() {
         }
         
         // Print to serial
-        Serial.println("\n========== SENSOR DATA (FAKE) ==========");
+        Serial.println("\n========== SENSOR DATA ==========");
         Serial.printf("Air Temp     : %.1f C\n", airTemp);
         Serial.printf("Air Humidity : %.1f %%\n", airHum);
-        Serial.printf("Soil Moisture: %.1f %%\n", moisture);
-        Serial.printf("Soil Temp    : %.1f C\n", soilTemp);
-        Serial.printf("pH           : %.1f\n", ph);
-        Serial.printf("EC           : %u uS/cm\n", ec);
-        Serial.printf("Nitrogen     : %u mg/kg\n", n);
-        Serial.printf("Phosphorus   : %u mg/kg\n", p);
-        Serial.printf("Potassium    : %u mg/kg\n", k);
+        Serial.printf("Soil Moisture: %.1f %% (waiting for sensor)\n", moisture);
+        Serial.printf("Soil Temp    : %.1f C (waiting for sensor)\n", soilTemp);
+        Serial.printf("pH           : %.1f (waiting for sensor)\n", ph);
+        Serial.printf("EC           : %u uS/cm (waiting for sensor)\n", ec);
+        Serial.printf("Nitrogen     : %u mg/kg (waiting for sensor)\n", n);
+        Serial.printf("Phosphorus   : %u mg/kg (waiting for sensor)\n", p);
+        Serial.printf("Potassium    : %u mg/kg (waiting for sensor)\n", k);
         Serial.println("=================================\n");
     }
     
