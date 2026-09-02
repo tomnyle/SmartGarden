@@ -39,9 +39,6 @@ const char* mqtt_password = "Danh@@@1992";
 const char* deviceId = "smartgarden";
 const char* discoveryPrefix = "homeassistant";
 
-// Flags
-bool discoveryPublished = false;
-
 // ================= RS485 CONTROL =================
 void preTransmission() {
     digitalWrite(MAX485_RE_DE, HIGH);
@@ -85,8 +82,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 // ================= PUBLISH DISCOVERY MESSAGES =================
 void publishDiscoveryMessages() {
-    if (discoveryPublished) return;
-    
     Serial.println("\n[MQTT Discovery] Publishing Home Assistant discovery...");
     
     char buffer[1024];
@@ -182,7 +177,6 @@ void publishDiscoveryMessages() {
     }
     
     Serial.println("[MQTT Discovery] All discovery messages published!\n");
-    discoveryPublished = true;
 }
 
 // ================= MQTT RECONNECT =================
@@ -193,7 +187,7 @@ void reconnect() {
         if (client.connect(deviceId, mqtt_user, mqtt_password)) {
             Serial.println(" Connected!");
             
-            // Publish discovery messages
+            // Publish discovery messages every time we reconnect
             publishDiscoveryMessages();
             
             // Subscribe to relay control topics
