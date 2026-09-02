@@ -3,6 +3,7 @@
 #include <PubSubClient.h>
 #include <DHT.h>
 #include <ModbusMaster.h>
+#include "app_config.h"
 
 // ================= GLOBAL INSTANCES =================
 WiFiClient espClient;
@@ -27,20 +28,38 @@ const char* relayNames[RELAY_COUNT] = {"Fan", "Heater", "Cooler", "Humidifier", 
 bool relayState[RELAY_COUNT] = {false};
 
 // WiFi config
-const char* ssid = "Le Danh";
-const char* password = "123456789";
+const char* ssid = WIFI_SSID;
+const char* password = WIFI_PASSWORD;
 
 // MQTT config
-const char* mqtt_server = "192.168.100.168";
-const int mqtt_port = 1883;
-const char* mqtt_user = "homer";
-const char* mqtt_password = "Danh@@@1992";
+const char* mqtt_server = MQTT_BROKER;
+const int mqtt_port = MQTT_PORT;
+const char* mqtt_user = MQTT_USERNAME;
+const char* mqtt_password = MQTT_PASSWORD;
 
 const char* deviceId = "smartgarden";
 const char* discoveryPrefix = "homeassistant";
 
 // Flags
 bool discoveryPublished = false;
+
+const uint16_t SOIL_SENSOR_START_REGISTER = 0x0000;
+const uint16_t SOIL_SENSOR_REGISTER_COUNT = 8;
+
+struct AirSensorReadings {
+    float temperature;
+    float humidity;
+};
+
+struct SoilSensorReadings {
+    float moisture;
+    float temperature;
+    float ph;
+    uint16_t ec;
+    uint16_t nitrogen;
+    uint16_t phosphorus;
+    uint16_t potassium;
+};
 
 // ================= RS485 CONTROL =================
 void preTransmission() {
@@ -49,6 +68,51 @@ void preTransmission() {
 
 void postTransmission() {
     digitalWrite(MAX485_RE_DE, LOW);
+}
+
+float decodeUnsignedTenths(uint16_t rawValue) {
+    return rawValue / 10.0f;
+}
+
+float decodeSignedTenths(uint16_t rawValue) {
+    return static_cast<int16_t>(rawValue) / 10.0f;
+}
+
+bool readAirSensor(AirSensorReadings& readings) {
+    readings.humidity = dht.readHumidity();
+    readings.temperature = dht.readTemperature();
+
+    if (isnan(readings.humidity) || isnan(readings.temperature)) {
+        Serial.println("[Sensor] DHT22 read failed");
+        return false;
+    }
+
+    return true;
+}
+
+bool readSoilSensor(SoilSensorReadings& readings) {
+    while (RS485Serial.available()) {
+        RS485Serial.read();
+    }
+
+    uint8_t result = node.readHoldingRegisters(SOIL_SENSOR_START_REGISTER, SOIL_SENSOR_REGISTER_COUNT);
+    if (result != ModbusMaster::ku8MBSuccess) {
+        Serial.printf("[Sensor] RS485 Modbus read failed (code=%u)\n", result);
+        return false;
+    }
+
+    readings.moisture = decodeUnsignedTenths(node.getResponseBuffer(0));
+    readings.temperature = decodeSignedTenths(node.getResponseBuffer(1));
+    readings.ph = decodeUnsignedTenths(node.getResponseBuffer(2));
+    readings.ec = node.getResponseBuffer(3);
+    readings.nitrogen = node.getResponseBuffer(4);
+    readings.phosphorus = node.getResponseBuffer(5);
+    readings.potassium = node.getResponseBuffer(6);
+    return true;
+}
+
+void publishUnavailable(const char* topic) {
+    client.publish(topic, "unavailable", true);
 }
 
 // ================= RELAY CONTROL =================
@@ -273,7 +337,7 @@ void setup() {
 
 // ================= LOOP =================
 unsigned long lastSensorRead = 0;
-const unsigned long SENSOR_READ_INTERVAL = 10000; // 10 seconds
+const unsigned long MQTT_PUBLISH_INTERVAL_MS = 10000; // 10 seconds
 
 void loop() {
     // WiFi reconnect check
@@ -289,46 +353,72 @@ void loop() {
     
     client.loop();
     
-    // Read sensors every SENSOR_READ_INTERVAL
+    // Read sensors every MQTT_PUBLISH_INTERVAL_MS
     unsigned long now = millis();
-    if (now - lastSensorRead >= SENSOR_READ_INTERVAL) {
+    if (now - lastSensorRead >= MQTT_PUBLISH_INTERVAL_MS) {
         lastSensorRead = now;
-        
-        // ===== FAKE DATA FOR TESTING (when sensors not connected) =====
-        float airTemp = 25.5;      // Fake temperature
-        float airHum = 60.0;       // Fake humidity
-        float moisture = 45.0;     // Fake soil moisture
-        float soilTemp = 22.0;     // Fake soil temperature
-        float ph = 6.8;            // Fake pH
-        uint16_t ec = 1200;        // Fake EC
-        uint16_t n = 150;          // Fake Nitrogen
-        uint16_t p = 80;           // Fake Phosphorus
-        uint16_t k = 120;          // Fake Potassium
-        
+
+        AirSensorReadings airReadings = {};
+        SoilSensorReadings soilReadings = {};
+        bool airSensorOk = readAirSensor(airReadings);
+        bool soilSensorOk = readSoilSensor(soilReadings);
+
         // Publish sensor data to MQTT
         if (client.connected()) {
-            client.publish("smartgarden/sensors/air_temp", String(airTemp, 1).c_str(), true);
-            client.publish("smartgarden/sensors/air_humidity", String(airHum, 1).c_str(), true);
-            client.publish("smartgarden/sensors/soil_moisture", String(moisture, 1).c_str(), true);
-            client.publish("smartgarden/sensors/soil_temp", String(soilTemp, 1).c_str(), true);
-            client.publish("smartgarden/sensors/ph", String(ph, 1).c_str(), true);
-            client.publish("smartgarden/sensors/ec", String(ec).c_str(), true);
-            client.publish("smartgarden/sensors/nitrogen", String(n).c_str(), true);
-            client.publish("smartgarden/sensors/phosphorus", String(p).c_str(), true);
-            client.publish("smartgarden/sensors/potassium", String(k).c_str(), true);
+            if (airSensorOk) {
+                client.publish("smartgarden/sensors/air_temp", String(airReadings.temperature, 1).c_str(), true);
+                client.publish("smartgarden/sensors/air_humidity", String(airReadings.humidity, 1).c_str(), true);
+            } else {
+                publishUnavailable("smartgarden/sensors/air_temp");
+                publishUnavailable("smartgarden/sensors/air_humidity");
+            }
+
+            if (soilSensorOk) {
+                client.publish("smartgarden/sensors/soil_moisture", String(soilReadings.moisture, 1).c_str(), true);
+                client.publish("smartgarden/sensors/soil_temp", String(soilReadings.temperature, 1).c_str(), true);
+                client.publish("smartgarden/sensors/ph", String(soilReadings.ph, 1).c_str(), true);
+                client.publish("smartgarden/sensors/ec", String(soilReadings.ec).c_str(), true);
+                client.publish("smartgarden/sensors/nitrogen", String(soilReadings.nitrogen).c_str(), true);
+                client.publish("smartgarden/sensors/phosphorus", String(soilReadings.phosphorus).c_str(), true);
+                client.publish("smartgarden/sensors/potassium", String(soilReadings.potassium).c_str(), true);
+            } else {
+                publishUnavailable("smartgarden/sensors/soil_moisture");
+                publishUnavailable("smartgarden/sensors/soil_temp");
+                publishUnavailable("smartgarden/sensors/ph");
+                publishUnavailable("smartgarden/sensors/ec");
+                publishUnavailable("smartgarden/sensors/nitrogen");
+                publishUnavailable("smartgarden/sensors/phosphorus");
+                publishUnavailable("smartgarden/sensors/potassium");
+            }
         }
-        
+
         // Print to serial
-        Serial.println("\n========== SENSOR DATA (FAKE) ==========");
-        Serial.printf("Air Temp     : %.1f C\n", airTemp);
-        Serial.printf("Air Humidity : %.1f %%\n", airHum);
-        Serial.printf("Soil Moisture: %.1f %%\n", moisture);
-        Serial.printf("Soil Temp    : %.1f C\n", soilTemp);
-        Serial.printf("pH           : %.1f\n", ph);
-        Serial.printf("EC           : %u uS/cm\n", ec);
-        Serial.printf("Nitrogen     : %u mg/kg\n", n);
-        Serial.printf("Phosphorus   : %u mg/kg\n", p);
-        Serial.printf("Potassium    : %u mg/kg\n", k);
+        Serial.println("\n========== SENSOR DATA (REAL) ==========");
+        if (airSensorOk) {
+            Serial.printf("Air Temp     : %.1f C\n", airReadings.temperature);
+            Serial.printf("Air Humidity : %.1f %%\n", airReadings.humidity);
+        } else {
+            Serial.println("Air Temp     : READ FAILED");
+            Serial.println("Air Humidity : READ FAILED");
+        }
+
+        if (soilSensorOk) {
+            Serial.printf("Soil Moisture: %.1f %%\n", soilReadings.moisture);
+            Serial.printf("Soil Temp    : %.1f C\n", soilReadings.temperature);
+            Serial.printf("pH           : %.1f\n", soilReadings.ph);
+            Serial.printf("EC           : %u uS/cm\n", soilReadings.ec);
+            Serial.printf("Nitrogen     : %u mg/kg\n", soilReadings.nitrogen);
+            Serial.printf("Phosphorus   : %u mg/kg\n", soilReadings.phosphorus);
+            Serial.printf("Potassium    : %u mg/kg\n", soilReadings.potassium);
+        } else {
+            Serial.println("Soil Moisture: READ FAILED");
+            Serial.println("Soil Temp    : READ FAILED");
+            Serial.println("pH           : READ FAILED");
+            Serial.println("EC           : READ FAILED");
+            Serial.println("Nitrogen     : READ FAILED");
+            Serial.println("Phosphorus   : READ FAILED");
+            Serial.println("Potassium    : READ FAILED");
+        }
         Serial.println("=================================\n");
     }
     
