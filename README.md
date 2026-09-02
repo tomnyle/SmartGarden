@@ -147,7 +147,7 @@ SmartGarden/
 
 1. **Thông số mặc định**: Nếu không đặt WiFi/MQTT, hệ thống sẽ dùng placeholder
 2. **Bơm nước mặc định**: Relay 0 được dùng cho bơm tưới
-3. **Thời gian cập nhật**: Mỗi 5 giây
+3. **Thời gian cập nhật**: Mỗi 10 giây
 4. **Lưu trữ**: Tối đa 16 loại cây
 
 ## 🎯 Ví Dụ Sử Dụng
