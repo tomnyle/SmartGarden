@@ -94,9 +94,13 @@ smartgarden/sensors/potassium      → Potassium (mg/kg)
 smartgarden/relay/1/state          → Trạng thái relay 1
 smartgarden/relay/1/set            → Điều khiển relay 1
 smartgarden/autocontrol/state      → Trạng thái auto control
+smartgarden/status                 → Trạng thái thiết bị MQTT (`online`/`offline`, retained)
 
 # Cảnh Báo
 smartgarden/alerts                 → Các cảnh báo thời gian thực
+
+# Home Assistant Discovery
+homeassistant/<component>/<object_id>/config  → MQTT discovery config (retained)
 ```
 
 ## 🔧 Cấu Hình
