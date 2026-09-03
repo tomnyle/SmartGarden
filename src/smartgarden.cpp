@@ -38,6 +38,12 @@ const char* mqtt_password = "Danh@@@1992";
 
 const char* deviceId = "smartgarden";
 const char* discoveryPrefix = "homeassistant";
+const char* availabilityTopic = "smartgarden/status";
+
+unsigned long lastMqttConnectAttempt = 0;
+unsigned long mqttReconnectDelayMs = 1000;
+const unsigned long MQTT_RECONNECT_DELAY_MAX_MS = 30000;
+bool mqttWasConnected = false;
 
 // ================= RS485 CONTROL =================
 void preTransmission() {
@@ -56,7 +62,8 @@ void setRelay(int index, bool state) {
     digitalWrite(relayPins[index], state ? LOW : HIGH);
     
     String stateTopic = "smartgarden/relay/" + String(index + 1) + "/state";
-    client.publish(stateTopic.c_str(), state ? "ON" : "OFF", true);
+    bool ok = client.publish(stateTopic.c_str(), state ? "ON" : "OFF", true);
+    Serial.printf("  [Relay State] %s = %s %s\n", stateTopic.c_str(), state ? "ON" : "OFF", ok ? "✓" : "✗");
     
     Serial.printf("[Relay] Relay %d -> %s\n", index + 1, state ? "ON" : "OFF");
 }
@@ -81,13 +88,26 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 // ================= PUBLISH DISCOVERY MESSAGES =================
+bool publishMqttMessage(const String& topic, const String& payload, bool retained, const char* logPrefix) {
+    bool ok = client.publish(topic.c_str(), payload.c_str(), retained);
+    Serial.printf("  [%s] %s = %s %s\n", logPrefix, topic.c_str(), payload.c_str(), ok ? "✓" : "✗");
+    return ok;
+}
+
+bool publishDiscoveryConfig(const String& topic, const char* payload) {
+    bool ok = client.publish(topic.c_str(), payload, true);
+    Serial.printf("  %s %s\n", topic.c_str(), ok ? "✓" : "✗");
+    return ok;
+}
+
 void publishDiscoveryMessages() {
     Serial.println("\n[MQTT Discovery] Publishing Home Assistant discovery...");
     
     char buffer[1024];
+    bool allOk = true;
     
     // Device info (used by all entities)
-    const char* deviceInfo = R"(,"device":{"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32","name":"Smart Garden"})";
+    const char* deviceInfo = R"(,"availability_topic":"smartgarden/status","payload_available":"online","payload_not_available":"offline","device":{"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32","name":"Smart Garden"})";
     
     // ===== SENSORS =====
     
@@ -95,73 +115,64 @@ void publishDiscoveryMessages() {
     snprintf(buffer, sizeof(buffer),
         "{\"name\":\"Air Temperature\",\"unique_id\":\"smartgarden_air_temp\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"unit_of_measurement\":\"C\",\"device_class\":\"temperature\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_air_temp/config").c_str(), buffer, true);
+    allOk &= publishDiscoveryConfig(String(discoveryPrefix) + "/sensor/smartgarden_air_temp/config", buffer);
     delay(100);
-    Serial.println("  OK Air Temperature");
     
     // Air Humidity
     snprintf(buffer, sizeof(buffer),
         "{\"name\":\"Air Humidity\",\"unique_id\":\"smartgarden_air_humidity\",\"state_topic\":\"smartgarden/sensors/air_humidity\",\"unit_of_measurement\":\"%%\",\"device_class\":\"humidity\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_air_humidity/config").c_str(), buffer, true);
+    allOk &= publishDiscoveryConfig(String(discoveryPrefix) + "/sensor/smartgarden_air_humidity/config", buffer);
     delay(100);
-    Serial.println("  OK Air Humidity");
     
     // Soil Moisture
     snprintf(buffer, sizeof(buffer),
         "{\"name\":\"Soil Moisture\",\"unique_id\":\"smartgarden_soil_moisture\",\"state_topic\":\"smartgarden/sensors/soil_moisture\",\"unit_of_measurement\":\"%%\",\"device_class\":\"moisture\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_soil_moisture/config").c_str(), buffer, true);
+    allOk &= publishDiscoveryConfig(String(discoveryPrefix) + "/sensor/smartgarden_soil_moisture/config", buffer);
     delay(100);
-    Serial.println("  OK Soil Moisture");
     
     // Soil Temperature
     snprintf(buffer, sizeof(buffer),
         "{\"name\":\"Soil Temperature\",\"unique_id\":\"smartgarden_soil_temp\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"unit_of_measurement\":\"C\",\"device_class\":\"temperature\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_soil_temp/config").c_str(), buffer, true);
+    allOk &= publishDiscoveryConfig(String(discoveryPrefix) + "/sensor/smartgarden_soil_temp/config", buffer);
     delay(100);
-    Serial.println("  OK Soil Temperature");
     
     // pH
     snprintf(buffer, sizeof(buffer),
         "{\"name\":\"pH Value\",\"unique_id\":\"smartgarden_ph\",\"state_topic\":\"smartgarden/sensors/ph\",\"unit_of_measurement\":\"pH\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_ph/config").c_str(), buffer, true);
+    allOk &= publishDiscoveryConfig(String(discoveryPrefix) + "/sensor/smartgarden_ph/config", buffer);
     delay(100);
-    Serial.println("  OK pH Value");
     
     // EC
     snprintf(buffer, sizeof(buffer),
         "{\"name\":\"EC\",\"unique_id\":\"smartgarden_ec\",\"state_topic\":\"smartgarden/sensors/ec\",\"unit_of_measurement\":\"uS/cm\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_ec/config").c_str(), buffer, true);
+    allOk &= publishDiscoveryConfig(String(discoveryPrefix) + "/sensor/smartgarden_ec/config", buffer);
     delay(100);
-    Serial.println("  OK EC");
     
     // Nitrogen
     snprintf(buffer, sizeof(buffer),
         "{\"name\":\"Nitrogen\",\"unique_id\":\"smartgarden_nitrogen\",\"state_topic\":\"smartgarden/sensors/nitrogen\",\"unit_of_measurement\":\"mg/kg\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_nitrogen/config").c_str(), buffer, true);
+    allOk &= publishDiscoveryConfig(String(discoveryPrefix) + "/sensor/smartgarden_nitrogen/config", buffer);
     delay(100);
-    Serial.println("  OK Nitrogen");
     
     // Phosphorus
     snprintf(buffer, sizeof(buffer),
         "{\"name\":\"Phosphorus\",\"unique_id\":\"smartgarden_phosphorus\",\"state_topic\":\"smartgarden/sensors/phosphorus\",\"unit_of_measurement\":\"mg/kg\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_phosphorus/config").c_str(), buffer, true);
+    allOk &= publishDiscoveryConfig(String(discoveryPrefix) + "/sensor/smartgarden_phosphorus/config", buffer);
     delay(100);
-    Serial.println("  OK Phosphorus");
     
     // Potassium
     snprintf(buffer, sizeof(buffer),
         "{\"name\":\"Potassium\",\"unique_id\":\"smartgarden_potassium\",\"state_topic\":\"smartgarden/sensors/potassium\",\"unit_of_measurement\":\"mg/kg\",\"state_class\":\"measurement\"%s}",
         deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_potassium/config").c_str(), buffer, true);
+    allOk &= publishDiscoveryConfig(String(discoveryPrefix) + "/sensor/smartgarden_potassium/config", buffer);
     delay(100);
-    Serial.println("  OK Potassium");
     
     // ===== SWITCHES (RELAYS) =====
     
@@ -171,39 +182,56 @@ void publishDiscoveryMessages() {
             relayNames[i], i + 1, i + 1, i + 1, deviceInfo);
         
         String switchTopic = String(discoveryPrefix) + "/switch/smartgarden_relay_" + String(i + 1) + "/config";
-        client.publish(switchTopic.c_str(), buffer, true);
+        allOk &= publishDiscoveryConfig(switchTopic, buffer);
         delay(100);
-        Serial.printf("  OK Relay %d: %s\n", i + 1, relayNames[i]);
     }
     
-    Serial.println("[MQTT Discovery] All discovery messages published!\n");
+    if (allOk) {
+        Serial.println("[MQTT Discovery] All discovery messages published!\n");
+    } else {
+        Serial.println("[MQTT Discovery] One or more discovery publishes failed!\n");
+    }
 }
 
 // ================= MQTT RECONNECT =================
 void reconnect() {
-    while (!client.connected()) {
-        Serial.print("[MQTT] Connecting...");
+    if (client.connected()) {
+        return;
+    }
+
+    unsigned long now = millis();
+    if (now - lastMqttConnectAttempt < mqttReconnectDelayMs) {
+        return;
+    }
+
+    lastMqttConnectAttempt = now;
+    Serial.print("[MQTT] Connecting...");
+    
+    if (client.connect(deviceId, mqtt_user, mqtt_password, availabilityTopic, 0, true, "offline")) {
+        Serial.println(" Connected!");
+        mqttWasConnected = true;
+        mqttReconnectDelayMs = 1000;
+
+        bool statusOk = client.publish(availabilityTopic, "online", true);
+        Serial.printf("[MQTT] Availability %s = online %s\n", availabilityTopic, statusOk ? "✓" : "✗");
         
-        if (client.connect(deviceId, mqtt_user, mqtt_password)) {
-            Serial.println(" Connected!");
-            
-            // Publish discovery messages every time we reconnect
-            publishDiscoveryMessages();
-            
-            // Subscribe to relay control topics
-            for (int i = 0; i < RELAY_COUNT; i++) {
-                String topic = "smartgarden/relay/" + String(i + 1) + "/set";
-                client.subscribe(topic.c_str());
-            }
-            
-            // Publish initial relay states
-            for (int i = 0; i < RELAY_COUNT; i++) {
-                setRelay(i, relayState[i]);
-            }
-        } else {
-            Serial.printf(" Failed (code=%d), retry in 3s\n", client.state());
-            delay(3000);
+        // Publish discovery messages every time we reconnect
+        publishDiscoveryMessages();
+        
+        // Subscribe to relay control topics
+        for (int i = 0; i < RELAY_COUNT; i++) {
+            String topic = "smartgarden/relay/" + String(i + 1) + "/set";
+            bool subOk = client.subscribe(topic.c_str());
+            Serial.printf("[MQTT] Subscribe %s %s\n", topic.c_str(), subOk ? "✓" : "✗");
         }
+        
+        // Publish initial relay states
+        for (int i = 0; i < RELAY_COUNT; i++) {
+            setRelay(i, relayState[i]);
+        }
+    } else {
+        Serial.printf(" Failed (code=%d), retry in %lu ms\n", client.state(), mqttReconnectDelayMs);
+        mqttReconnectDelayMs = min(mqttReconnectDelayMs * 2, MQTT_RECONNECT_DELAY_MAX_MS);
     }
 }
 
@@ -260,6 +288,8 @@ void setup() {
     Serial.printf("[Setup] Initializing MQTT: %s:%d\n", mqtt_server, mqtt_port);
     client.setServer(mqtt_server, mqtt_port);
     client.setCallback(callback);
+    bool bufferSet = client.setBufferSize(1024);
+    Serial.printf("[Setup] MQTT buffer size 1024 bytes %s\n", bufferSet ? "✓" : "✗");
     reconnect();
     
     Serial.println("========== Setup Complete ==========\n");
@@ -267,7 +297,7 @@ void setup() {
 
 // ================= LOOP =================
 unsigned long lastSensorRead = 0;
-const unsigned long SENSOR_READ_INTERVAL = 10000; // 10 seconds
+const unsigned long SENSOR_READ_INTERVAL = 5000; // 5 seconds
 
 void loop() {
     // WiFi reconnect check
@@ -278,6 +308,10 @@ void loop() {
     
     // MQTT reconnect check
     if (!client.connected()) {
+        if (mqttWasConnected) {
+            mqttWasConnected = false;
+            Serial.println("[MQTT] Connection lost");
+        }
         reconnect();
     }
     
@@ -315,15 +349,16 @@ void loop() {
         
         // Publish sensor data to MQTT
         if (client.connected()) {
-            client.publish("smartgarden/sensors/air_temp", String(airTemp, 1).c_str(), true);
-            client.publish("smartgarden/sensors/air_humidity", String(airHum, 1).c_str(), true);
-            client.publish("smartgarden/sensors/soil_moisture", String(moisture, 1).c_str(), true);
-            client.publish("smartgarden/sensors/soil_temp", String(soilTemp, 1).c_str(), true);
-            client.publish("smartgarden/sensors/ph", String(ph, 1).c_str(), true);
-            client.publish("smartgarden/sensors/ec", String(ec).c_str(), true);
-            client.publish("smartgarden/sensors/nitrogen", String(n).c_str(), true);
-            client.publish("smartgarden/sensors/phosphorus", String(p).c_str(), true);
-            client.publish("smartgarden/sensors/potassium", String(k).c_str(), true);
+            Serial.println("[Sensor Data] Publishing state...");
+            publishMqttMessage("smartgarden/sensors/air_temp", String(airTemp, 1), true, "Sensor Data");
+            publishMqttMessage("smartgarden/sensors/air_humidity", String(airHum, 1), true, "Sensor Data");
+            publishMqttMessage("smartgarden/sensors/soil_moisture", String(moisture, 1), true, "Sensor Data");
+            publishMqttMessage("smartgarden/sensors/soil_temp", String(soilTemp, 1), true, "Sensor Data");
+            publishMqttMessage("smartgarden/sensors/ph", String(ph, 1), true, "Sensor Data");
+            publishMqttMessage("smartgarden/sensors/ec", String(ec), true, "Sensor Data");
+            publishMqttMessage("smartgarden/sensors/nitrogen", String(n), true, "Sensor Data");
+            publishMqttMessage("smartgarden/sensors/phosphorus", String(p), true, "Sensor Data");
+            publishMqttMessage("smartgarden/sensors/potassium", String(k), true, "Sensor Data");
         }
         
         // Print to serial
