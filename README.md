@@ -102,7 +102,9 @@ smartgarden/alerts                 → Các cảnh báo thời gian thực
 ## 🔧 Cấu Hình
 
 ### WiFi & MQTT
-Chỉnh sửa trong `include/config.h`:
+Firmware hiện publish Home Assistant MQTT Discovery trong `src/smartgarden.cpp` với prefix mặc định `homeassistant`.
+
+Thông số WiFi/MQTT đang cấu hình trong `src/smartgarden.cpp` (biến `ssid`, `password`, `mqtt_server`, `mqtt_user`, `mqtt_password`) và cũng có macro trong `include/app_config.h`:
 ```cpp
 #define SMARTGARDEN_WIFI_SSID "YOUR_WIFI_SSID"
 #define SMARTGARDEN_WIFI_PASSWORD "YOUR_PASSWORD"
@@ -123,9 +125,9 @@ Payload: "lettuce"  (hoặc: tomato, ginseng, salvia, morinda, strawberry, v.v.)
 ```
 SmartGarden/
 ├── src/
-│   └── smartgarden.ino          # Main firmware
+│   └── smartgarden.cpp          # Main firmware (setup/loop + MQTT discovery)
 ├── include/
-│   ├── config.h                  # Cấu hình tập trung
+│   ├── app_config.h              # Cấu hình tập trung
 │   ├── crop_profiles.h           # Định nghĩa loại cây
 │   ├── auto_control.h            # Logic điều khiển
 │   └── mqtt_handler.h            # MQTT topics
