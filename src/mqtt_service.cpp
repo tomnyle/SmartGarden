@@ -10,13 +10,14 @@ void mqttMessageCallback(char* topic, byte* payload, unsigned int length) {
     }
 }
 
+static const char* SMARTGARDEN_DEVICE_INFO = R"({"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32 SmartGarden Controller","name":"Smart Garden"})";
+
 MQTTService::MQTTService(const char* broker, int port)
     : client(nullptr), mqttBroker(broker), mqttPort(port), connected(false),
       lastPublishTime(0), publishInterval(5000), lastDiscoveryTime(0),
       relayCallback(nullptr), cropCallback(nullptr)
 {
-    strncpy(deviceId, "SmartGarden_", sizeof(deviceId) - 1);
-    strncat(deviceId, String(ESP.getEfuseMac()).c_str(), sizeof(deviceId) - strlen(deviceId) - 1);
+    snprintf(deviceId, sizeof(deviceId), "SmartGarden_%llu", (unsigned long long)ESP.getEfuseMac());
     memset(mqttUsername, 0, sizeof(mqttUsername));
     memset(mqttPassword, 0, sizeof(mqttPassword));
     g_mqttService = this;
@@ -57,8 +58,8 @@ bool MQTTService::connect()
         connected = true;
         publishStatus("online");
         subscribeToTopics();
-        publishCropList();
         publishDiscoveryMessages();
+        publishCropList();
         return true;
     }
 
@@ -72,17 +73,14 @@ bool MQTTService::isConnected() const { return client && client->connected(); }
 void MQTTService::loop()
 {
     if (!client) return;
-    if (!client->connected()) {
-        if (millis() % 5000 == 0) connect();
-    } else {
-        client->loop();
-    }
+    if (client->connected()) client->loop();
+    else if (millis() - lastDiscoveryTime > 5000) { lastDiscoveryTime = millis(); connect(); }
 }
 
 bool MQTTService::publish(const char* topic, const char* payload)
 {
     if (!client || !client->connected()) return false;
-    String fullTopic = String("smartgarden/") + String(deviceId) + "/" + String(topic);
+    String fullTopic = String("smartgarden/") + deviceId + "/" + String(topic);
     return client->publish(fullTopic.c_str(), payload, true);
 }
 
@@ -90,7 +88,8 @@ bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
 {
     if (!client || !client->connected()) return false;
 
-    char payload[64];
+    char payload[32];
+
     snprintf(payload, sizeof(payload), "%.1f", snapshot.airTemp);
     client->publish((String("smartgarden/") + deviceId + "/sensors/air_temp").c_str(), payload, true);
 
@@ -124,10 +123,8 @@ bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
 bool MQTTService::publishRelayStatus(uint8_t relayIndex, bool state)
 {
     if (!client || !client->connected()) return false;
-
     const char* relayNames[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation", "relay7", "relay8"};
     if (relayIndex >= 8) return false;
-
     String topic = String("smartgarden/") + deviceId + "/relays/" + relayNames[relayIndex];
     return client->publish(topic.c_str(), state ? "ON" : "OFF", true);
 }
@@ -171,8 +168,7 @@ bool MQTTService::publishCurrentCrop(const CropProfile* profile)
 bool MQTTService::publishStatus(const char* status)
 {
     if (!client || !client->connected()) return false;
-    String topic = String("smartgarden/") + deviceId + "/status";
-    return client->publish(topic.c_str(), status, true);
+    return client->publish((String("smartgarden/") + deviceId + "/status").c_str(), status, true);
 }
 
 bool MQTTService::publishUptime(unsigned long uptime)
@@ -180,8 +176,7 @@ bool MQTTService::publishUptime(unsigned long uptime)
     if (!client || !client->connected()) return false;
     char payload[32];
     snprintf(payload, sizeof(payload), "%lu", uptime / 1000);
-    String topic = String("smartgarden/") + deviceId + "/uptime";
-    return client->publish(topic.c_str(), payload, true);
+    return client->publish((String("smartgarden/") + deviceId + "/uptime").c_str(), payload, true);
 }
 
 void MQTTService::subscribeToTopics()
@@ -205,7 +200,6 @@ void MQTTService::handleRelayCommand(const char* relayName, const char* payload)
     uint8_t relayIndex = 0xFF;
     for (uint8_t i = 0; i < 8; i++) if (strcmp(relayName, relayNames[i]) == 0) { relayIndex = i; break; }
     if (relayIndex == 0xFF) return;
-
     bool state = (strcmp(payload, "ON") == 0 || strcmp(payload, "1") == 0);
     if (relayCallback) relayCallback(relayIndex, state);
 }
@@ -217,7 +211,7 @@ void MQTTService::handleCropSelect(const char* payload)
 
 void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int length)
 {
-    char message[256];
+    char message[128];
     if (length >= sizeof(message)) length = sizeof(message) - 1;
     strncpy(message, (char*)payload, length);
     message[length] = '\0';
@@ -241,72 +235,85 @@ void MQTTService::publishDiscoveryMessages()
 {
     if (!client || !client->connected()) return;
 
-    const char* deviceInfo = R"({"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32 SmartGarden Controller","name":"Smart Garden"})";
-    char buffer[1024];
-    auto pub = [&](const char* topic, const char* json){ client->publish(topic, json, true); };
+    char topic[160];
+    char payload[1024];
+    auto pub = [&](const char* t, const char* p){ client->publish(t, p, true); };
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Temperature\",\"object_id\":\"smartgarden_air_temp\",\"unique_id\":\"smartgarden_air_temp\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"device\":%s}",
-        deviceInfo);
-    pub("homeassistant/sensor/smartgarden_air_temp/config", buffer);
+    snprintf(topic, sizeof(topic), "homeassistant/binary_sensor/smartgarden_status/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"System Online\",\"object_id\":\"smartgarden_status\",\"unique_id\":\"smartgarden_status\",\"state_topic\":\"smartgarden/status\",\"payload_on\":\"online\",\"payload_off\":\"offline\",\"device_class\":\"connectivity\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Humidity\",\"object_id\":\"smartgarden_air_humidity\",\"unique_id\":\"smartgarden_air_humidity\",\"state_topic\":\"smartgarden/sensors/air_humidity\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device_class\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"device\":%s}",
-        deviceInfo);
-    pub("homeassistant/sensor/smartgarden_air_humidity/config", buffer);
+    snprintf(topic, sizeof(topic), "homeassistant/sensor/smartgarden_air_temp/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"Air Temperature\",\"object_id\":\"smartgarden_air_temp\",\"unique_id\":\"smartgarden_air_temp\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Moisture\",\"object_id\":\"smartgarden_soil_moisture\",\"unique_id\":\"smartgarden_soil_moisture\",\"state_topic\":\"smartgarden/sensors/soil_moisture\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device_class\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"device\":%s}",
-        deviceInfo);
-    pub("homeassistant/sensor/smartgarden_soil_moisture/config", buffer);
+    snprintf(topic, sizeof(topic), "homeassistant/sensor/smartgarden_air_humidity/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"Air Humidity\",\"object_id\":\"smartgarden_air_humidity\",\"unique_id\":\"smartgarden_air_humidity\",\"state_topic\":\"smartgarden/sensors/air_humidity\",\"device_class\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Temperature\",\"object_id\":\"smartgarden_soil_temp\",\"unique_id\":\"smartgarden_soil_temp\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"device\":%s}",
-        deviceInfo);
-    pub("homeassistant/sensor/smartgarden_soil_temp/config", buffer);
+    snprintf(topic, sizeof(topic), "homeassistant/sensor/smartgarden_soil_moisture/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"Soil Moisture\",\"object_id\":\"smartgarden_soil_moisture\",\"unique_id\":\"smartgarden_soil_moisture\",\"state_topic\":\"smartgarden/sensors/soil_moisture\",\"device_class\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"pH Value\",\"object_id\":\"smartgarden_ph\",\"unique_id\":\"smartgarden_ph\",\"state_topic\":\"smartgarden/sensors/ph\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"state_class\":\"measurement\",\"device\":%s}",
-        deviceInfo);
-    pub("homeassistant/sensor/smartgarden_ph/config", buffer);
+    snprintf(topic, sizeof(topic), "homeassistant/sensor/smartgarden_soil_temp/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"Soil Temperature\",\"object_id\":\"smartgarden_soil_temp\",\"unique_id\":\"smartgarden_soil_temp\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"EC\",\"object_id\":\"smartgarden_ec\",\"unique_id\":\"smartgarden_ec\",\"state_topic\":\"smartgarden/sensors/ec\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"device\":%s}",
-        deviceInfo);
-    pub("homeassistant/sensor/smartgarden_ec/config", buffer);
+    snprintf(topic, sizeof(topic), "homeassistant/sensor/smartgarden_ph/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"pH Value\",\"object_id\":\"smartgarden_ph\",\"unique_id\":\"smartgarden_ph\",\"state_topic\":\"smartgarden/sensors/ph\",\"state_class\":\"measurement\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Nitrogen\",\"object_id\":\"smartgarden_nitrogen\",\"unique_id\":\"smartgarden_nitrogen\",\"state_topic\":\"smartgarden/sensors/nitrogen\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
-        deviceInfo);
-    pub("homeassistant/sensor/smartgarden_nitrogen/config", buffer);
+    snprintf(topic, sizeof(topic), "homeassistant/sensor/smartgarden_ec/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"EC\",\"object_id\":\"smartgarden_ec\",\"unique_id\":\"smartgarden_ec\",\"state_topic\":\"smartgarden/sensors/ec\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Phosphorus\",\"object_id\":\"smartgarden_phosphorus\",\"unique_id\":\"smartgarden_phosphorus\",\"state_topic\":\"smartgarden/sensors/phosphorus\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
-        deviceInfo);
-    pub("homeassistant/sensor/smartgarden_phosphorus/config", buffer);
+    snprintf(topic, sizeof(topic), "homeassistant/sensor/smartgarden_nitrogen/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"Nitrogen\",\"object_id\":\"smartgarden_nitrogen\",\"unique_id\":\"smartgarden_nitrogen\",\"state_topic\":\"smartgarden/sensors/nitrogen\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Potassium\",\"object_id\":\"smartgarden_potassium\",\"unique_id\":\"smartgarden_potassium\",\"state_topic\":\"smartgarden/sensors/potassium\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
-        deviceInfo);
-    pub("homeassistant/sensor/smartgarden_potassium/config", buffer);
+    snprintf(topic, sizeof(topic), "homeassistant/sensor/smartgarden_phosphorus/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"Phosphorus\",\"object_id\":\"smartgarden_phosphorus\",\"unique_id\":\"smartgarden_phosphorus\",\"state_topic\":\"smartgarden/sensors/phosphorus\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
+
+    snprintf(topic, sizeof(topic), "homeassistant/sensor/smartgarden_potassium/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"Potassium\",\"object_id\":\"smartgarden_potassium\",\"unique_id\":\"smartgarden_potassium\",\"state_topic\":\"smartgarden/sensors/potassium\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
 
     const char* relayNames[] = {"Circulation Fan", "Heater", "Cooler", "Humidifier", "Dehumidifier", "Irrigation", "Relay 7", "Relay 8"};
     const char* relayIds[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation", "relay7", "relay8"};
     for (uint8_t i = 0; i < 8; i++) {
-        snprintf(buffer, sizeof(buffer),
-            "{\"name\":\"%s\",\"object_id\":\"smartgarden_%s\",\"unique_id\":\"smartgarden_%s\",\"state_topic\":\"smartgarden/relay/%u/state\",\"command_topic\":\"smartgarden/relay/%u/set\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"device\":%s}",
-            relayNames[i], relayIds[i], relayIds[i], i + 1, i + 1, deviceInfo);
-        char topic[128];
         snprintf(topic, sizeof(topic), "homeassistant/switch/smartgarden_%s/config", relayIds[i]);
-        pub(topic, buffer);
+        snprintf(payload, sizeof(payload),
+            "{\"name\":\"%s\",\"object_id\":\"smartgarden_%s\",\"unique_id\":\"smartgarden_%s\",\"state_topic\":\"smartgarden/relay/%u/state\",\"command_topic\":\"smartgarden/relay/%u/set\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+            relayNames[i], relayIds[i], relayIds[i], i + 1, i + 1, SMARTGARDEN_DEVICE_INFO);
+        pub(topic, payload);
     }
 
-    snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Crop Profile\",\"object_id\":\"smartgarden_crop\",\"unique_id\":\"smartgarden_crop\",\"command_topic\":\"smartgarden/%s/crop/select\",\"state_topic\":\"smartgarden/%s/crop/current\",\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"options\":[\"Sâm\",\"Cà chua\",\"Dâu tây\",\"Rau mầm\",\"Cải kale\",\"Bánh chua\",\"Thơm\",\"Xà lách\",\"Ớt\",\"Cúc hoa mi\",\"Chanh\",\"Bạc hà\",\"Tỏi\"],\"device\":%s}",
-        deviceId, deviceId, deviceInfo);
-    pub("homeassistant/select/smartgarden_crop/config", buffer);
+    snprintf(topic, sizeof(topic), "homeassistant/select/smartgarden_crop/config");
+    snprintf(payload, sizeof(payload),
+        "{\"name\":\"Crop Profile\",\"object_id\":\"smartgarden_crop\",\"unique_id\":\"smartgarden_crop\",\"command_topic\":\"smartgarden/%s/crop/select\",\"state_topic\":\"smartgarden/%s/crop/current\",\"options\":[\"Sâm\",\"Cà chua\",\"Dâu tây\",\"Rau mầm\",\"Cải kale\",\"Bánh chua\",\"Thơm\",\"Xà lách\",\"Ớt\",\"Cúc hoa mi\",\"Chanh\",\"Bạc hà\",\"Tỏi\"],\"availability_topic\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"device\":%s}",
+        deviceId, deviceId, SMARTGARDEN_DEVICE_INFO);
+    pub(topic, payload);
 
-    client->publish("homeassistant/binary_sensor/smartgarden_status/config",
-        "{\"name\":\"System Online\",\"object_id\":\"smartgarden_status\",\"unique_id\":\"smartgarden_status\",\"state_topic\":\"smartgarden/status\",\"payload_on\":\"online\",\"payload_off\":\"offline\",\"device_class\":\"connectivity\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"manufacturer\":\"DIY\",\"model\":\"ESP32 SmartGarden Controller\",\"name\":\"Smart Garden\"}}",
-        true);
+    Serial.println("[MQTTService] Discovery messages published!");
 }
