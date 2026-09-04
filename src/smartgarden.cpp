@@ -122,7 +122,7 @@ void setup() {
 
 // ================= LOOP =================
 unsigned long lastSensorRead = 0;
-const unsigned long SENSOR_READ_INTERVAL = 10000; // 10 seconds
+const unsigned long SENSOR_READ_INTERVAL_MS = 10000; // 10 seconds
 
 void loop() {
     // WiFi reconnect check
@@ -131,9 +131,9 @@ void loop() {
         WiFi.reconnect();
     }
     
-    // Read sensors every SENSOR_READ_INTERVAL
+    // Read sensors every SENSOR_READ_INTERVAL_MS
     unsigned long now = millis();
-    if (now - lastSensorRead >= SENSOR_READ_INTERVAL) {
+    if (now - lastSensorRead >= SENSOR_READ_INTERVAL_MS) {
         lastSensorRead = now;
         
         // ===== READ REAL SENSOR DATA =====
