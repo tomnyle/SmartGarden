@@ -61,6 +61,13 @@ void setRelay(int index, bool state) {
     Serial.printf("[Relay] Relay %d -> %s\n", index + 1, state ? "ON" : "OFF");
 }
 
+void publishRelayStateOnly(int index) {
+    if (index < 0 || index >= RELAY_COUNT) return;
+
+    String stateTopic = "smartgarden/relay/" + String(index + 1) + "/state";
+    client.publish(stateTopic.c_str(), relayState[index] ? "ON" : "OFF", true);
+}
+
 // ================= MQTT CALLBACK =================
 void callback(char* topic, byte* payload, unsigned int length) {
     String msg = "";
@@ -198,7 +205,7 @@ void reconnect() {
             
             // Publish initial relay states
             for (int i = 0; i < RELAY_COUNT; i++) {
-                setRelay(i, relayState[i]);
+                publishRelayStateOnly(i);
             }
         } else {
             Serial.printf(" Failed (code=%d), retry in 3s\n", client.state());
