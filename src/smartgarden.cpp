@@ -3,9 +3,6 @@
 #include <PubSubClient.h>
 #include <DHT.h>
 #include <ModbusMaster.h>
-#include "app_config.h"
-#include "mqtt_service.h"
-#include "sensor_manager.h"
 
 // ================= GLOBAL INSTANCES =================
 WiFiClient espClient;
@@ -26,12 +23,21 @@ ModbusMaster node;
 // RELAY
 #define RELAY_COUNT 8
 int relayPins[RELAY_COUNT] = {5, 18, 19, 27, 32, 33, 25, 26};
+const char* relayNames[RELAY_COUNT] = {"Fan", "Heater", "Cooler", "Humidifier", "Dehumidifier", "Irrigation", "Relay7", "Relay8"};
 bool relayState[RELAY_COUNT] = {false};
 
-const char* deviceId = "smartgarden";
-SensorSnapshot sensorSnapshot = {};
+// WiFi config
+const char* ssid = "Le Danh";
+const char* password = "123456789";
 
-MQTTService mqttService(&client, deviceId);
+// MQTT config
+const char* mqtt_server = "192.168.100.168";
+const int mqtt_port = 1883;
+const char* mqtt_user = "homer";
+const char* mqtt_password = "Danh@@@1992";
+
+const char* deviceId = "smartgarden";
+const char* discoveryPrefix = "homeassistant";
 
 // ================= RS485 CONTROL =================
 void preTransmission() {
@@ -42,6 +48,12 @@ void postTransmission() {
     digitalWrite(MAX485_RE_DE, LOW);
 }
 
+// ================= HELPERS =================
+static void publishDiscoveryMessage(const char* topic, const char* payload) {
+    client.publish(topic, payload, true);
+    delay(50);
+}
+
 // ================= RELAY CONTROL =================
 void setRelay(int index, bool state) {
     if (index < 0 || index >= RELAY_COUNT) return;
@@ -49,15 +61,121 @@ void setRelay(int index, bool state) {
     relayState[index] = state;
     digitalWrite(relayPins[index], state ? LOW : HIGH);
 
-    Serial.printf("[Relay] Relay %d -> %s\n", index + 1, state ? "ON" : "OFF");
+    String stateTopic = "smartgarden/relay/" + String(index + 1) + "/state";
+    client.publish(stateTopic.c_str(), state ? "ON" : "OFF", true);
 
-    if (mqttService.isConnected()) {
-        mqttService.publishRelayStatus(static_cast<uint8_t>(index), state);
+    Serial.printf("[Relay] Relay %d -> %s\n", index + 1, state ? "ON" : "OFF");
+}
+
+// ================= MQTT CALLBACK =================
+void callback(char* topic, byte* payload, unsigned int length) {
+    String msg;
+    for (unsigned int i = 0; i < length; i++) {
+        msg += (char)payload[i];
+    }
+
+    Serial.printf("[MQTT RX] %s = %s\n", topic, msg.c_str());
+
+    for (int i = 0; i < RELAY_COUNT; i++) {
+        String cmdTopic = "smartgarden/relay/" + String(i + 1) + "/set";
+        if (String(topic) == cmdTopic) {
+            if (msg == "ON") setRelay(i, true);
+            else if (msg == "OFF") setRelay(i, false);
+        }
     }
 }
 
-void onRelayCommand(uint8_t relayIndex, bool state) {
-    setRelay(relayIndex, state);
+// ================= PUBLISH DISCOVERY MESSAGES =================
+void publishDiscoveryMessages() {
+    Serial.println("\n[MQTT Discovery] Publishing Home Assistant discovery...");
+
+    char buffer[1024];
+    const char* deviceInfo = R"({"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32","name":"Smart Garden"})";
+
+    // Sensors
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Air Temperature\",\"unique_id\":\"smartgarden_air_temp\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"device\":%s}",
+        deviceInfo);
+    publishDiscoveryMessage("homeassistant/sensor/smartgarden_air_temp/config", buffer);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Air Humidity\",\"unique_id\":\"smartgarden_air_humidity\",\"state_topic\":\"smartgarden/sensors/air_humidity\",\"device_class\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"device\":%s}",
+        deviceInfo);
+    publishDiscoveryMessage("homeassistant/sensor/smartgarden_air_humidity/config", buffer);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Soil Moisture\",\"unique_id\":\"smartgarden_soil_moisture\",\"state_topic\":\"smartgarden/sensors/soil_moisture\",\"device_class\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"device\":%s}",
+        deviceInfo);
+    publishDiscoveryMessage("homeassistant/sensor/smartgarden_soil_moisture/config", buffer);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Soil Temperature\",\"unique_id\":\"smartgarden_soil_temp\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"device\":%s}",
+        deviceInfo);
+    publishDiscoveryMessage("homeassistant/sensor/smartgarden_soil_temp/config", buffer);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"pH Value\",\"unique_id\":\"smartgarden_ph\",\"state_topic\":\"smartgarden/sensors/ph\",\"state_class\":\"measurement\",\"device\":%s}",
+        deviceInfo);
+    publishDiscoveryMessage("homeassistant/sensor/smartgarden_ph/config", buffer);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"EC\",\"unique_id\":\"smartgarden_ec\",\"state_topic\":\"smartgarden/sensors/ec\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"device\":%s}",
+        deviceInfo);
+    publishDiscoveryMessage("homeassistant/sensor/smartgarden_ec/config", buffer);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Nitrogen\",\"unique_id\":\"smartgarden_nitrogen\",\"state_topic\":\"smartgarden/sensors/nitrogen\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
+        deviceInfo);
+    publishDiscoveryMessage("homeassistant/sensor/smartgarden_nitrogen/config", buffer);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Phosphorus\",\"unique_id\":\"smartgarden_phosphorus\",\"state_topic\":\"smartgarden/sensors/phosphorus\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
+        deviceInfo);
+    publishDiscoveryMessage("homeassistant/sensor/smartgarden_phosphorus/config", buffer);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Potassium\",\"unique_id\":\"smartgarden_potassium\",\"state_topic\":\"smartgarden/sensors/potassium\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
+        deviceInfo);
+    publishDiscoveryMessage("homeassistant/sensor/smartgarden_potassium/config", buffer);
+
+    // Switches
+    const char* relayIds[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation", "relay7", "relay8"};
+    for (int i = 0; i < RELAY_COUNT; i++) {
+        snprintf(buffer, sizeof(buffer),
+            "{\"name\":\"%s\",\"unique_id\":\"smartgarden_%s\",\"state_topic\":\"smartgarden/relay/%d/state\",\"command_topic\":\"smartgarden/relay/%d/set\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"device\":%s}",
+            relayNames[i], relayIds[i], i + 1, i + 1, deviceInfo);
+
+        char switchTopic[128];
+        snprintf(switchTopic, sizeof(switchTopic), "homeassistant/switch/smartgarden_%s/config", relayIds[i]);
+        publishDiscoveryMessage(switchTopic, buffer);
+    }
+
+    Serial.println("[MQTT Discovery] All discovery messages published!\n");
+}
+
+// ================= MQTT RECONNECT =================
+void reconnect() {
+    while (!client.connected()) {
+        Serial.print("[MQTT] Connecting...");
+
+        if (client.connect(deviceId, mqtt_user, mqtt_password)) {
+            Serial.println(" Connected!");
+
+            publishDiscoveryMessages();
+
+            for (int i = 0; i < RELAY_COUNT; i++) {
+                String topic = "smartgarden/relay/" + String(i + 1) + "/set";
+                client.subscribe(topic.c_str());
+            }
+
+            for (int i = 0; i < RELAY_COUNT; i++) {
+                setRelay(i, relayState[i]);
+            }
+        } else {
+            Serial.printf(" Failed (code=%d), retry in 3s\n", client.state());
+            delay(3000);
+        }
+    }
 }
 
 // ================= SETUP =================
@@ -67,7 +185,6 @@ void setup() {
 
     Serial.println("\n\n========== SmartGarden Startup ==========");
 
-    // Initialize Relays
     Serial.println("[Setup] Initializing relays...");
     for (int i = 0; i < RELAY_COUNT; i++) {
         pinMode(relayPins[i], OUTPUT);
@@ -76,12 +193,10 @@ void setup() {
     }
     Serial.println("[Setup] Relays initialized");
 
-    // Initialize DHT22
     Serial.println("[Setup] Initializing DHT22...");
     dht.begin();
     Serial.println("[Setup] DHT22 initialized");
 
-    // Initialize RS485
     Serial.println("[Setup] Initializing RS485...");
     pinMode(MAX485_RE_DE, OUTPUT);
     digitalWrite(MAX485_RE_DE, LOW);
@@ -91,9 +206,8 @@ void setup() {
     node.postTransmission(postTransmission);
     Serial.println("[Setup] RS485 initialized");
 
-    // Connect WiFi
-    Serial.printf("[Setup] Connecting to WiFi: %s\n", WIFI_SSID);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    Serial.printf("[Setup] Connecting to WiFi: %s\n", ssid);
+    WiFi.begin(ssid, password);
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20) {
         delay(500);
@@ -109,29 +223,32 @@ void setup() {
         Serial.println("[WiFi] Failed to connect!");
     }
 
-    // Setup MQTT
-    Serial.printf("[Setup] Initializing MQTT: %s:%d\n", MQTT_BROKER, MQTT_PORT);
-    client.setServer(MQTT_BROKER, MQTT_PORT);
-    mqttService.begin(MQTT_USERNAME, MQTT_PASSWORD);
-    mqttService.setRelayCommandCallback(onRelayCommand);
+    Serial.printf("[Setup] Initializing MQTT: %s:%d\n", mqtt_server, mqtt_port);
+    client.setServer(mqtt_server, mqtt_port);
+    client.setCallback(callback);
+    reconnect();
 
     Serial.println("========== Setup Complete ==========");
 }
 
 // ================= LOOP =================
 unsigned long lastSensorRead = 0;
-const unsigned long SENSOR_READ_INTERVAL_MS = 10000; // 10 seconds
+const unsigned long SENSOR_READ_INTERVAL = 10000;
 
 void loop() {
-    // WiFi reconnect check
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("[WiFi] Reconnecting...");
         WiFi.reconnect();
     }
 
-    // Read sensors every SENSOR_READ_INTERVAL_MS
+    if (!client.connected()) {
+        reconnect();
+    }
+
+    client.loop();
+
     unsigned long now = millis();
-    if (now - lastSensorRead >= SENSOR_READ_INTERVAL_MS) {
+    if (now - lastSensorRead >= SENSOR_READ_INTERVAL) {
         lastSensorRead = now;
 
         float airTemp = dht.readTemperature();
@@ -154,16 +271,17 @@ void loop() {
         uint16_t p = 0;
         uint16_t k = 0;
 
-        sensorSnapshot.airTemp = airTemp;
-        sensorSnapshot.airHumidity = airHum;
-        sensorSnapshot.soilMoisture = moisture;
-        sensorSnapshot.soilTemp = soilTemp;
-        sensorSnapshot.ph = ph;
-        sensorSnapshot.ec = ec;
-        sensorSnapshot.nitrogen = n;
-        sensorSnapshot.phosphorus = p;
-        sensorSnapshot.potassium = k;
-        sensorSnapshot.timestamp = (now == 0) ? 1 : now;
+        if (client.connected()) {
+            client.publish("smartgarden/sensors/air_temp", String(airTemp, 1).c_str(), true);
+            client.publish("smartgarden/sensors/air_humidity", String(airHum, 1).c_str(), true);
+            client.publish("smartgarden/sensors/soil_moisture", String(moisture, 1).c_str(), true);
+            client.publish("smartgarden/sensors/soil_temp", String(soilTemp, 1).c_str(), true);
+            client.publish("smartgarden/sensors/ph", String(ph, 1).c_str(), true);
+            client.publish("smartgarden/sensors/ec", String(ec).c_str(), true);
+            client.publish("smartgarden/sensors/nitrogen", String(n).c_str(), true);
+            client.publish("smartgarden/sensors/phosphorus", String(p).c_str(), true);
+            client.publish("smartgarden/sensors/potassium", String(k).c_str(), true);
+        }
 
         Serial.println("\n========== SENSOR DATA ==========");
         Serial.printf("Air Temp     : %.1f C\n", airTemp);
@@ -177,8 +295,6 @@ void loop() {
         Serial.printf("Potassium    : %u mg/kg (waiting for sensor)\n", k);
         Serial.println("=================================");
     }
-
-    mqttService.loop();
 
     delay(10);
 }
