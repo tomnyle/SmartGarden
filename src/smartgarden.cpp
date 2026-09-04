@@ -125,7 +125,7 @@ void publishDiscoveryMessages() {
     publishDiscoveryConfig("sensor", "smartgarden_ph", buffer, "pH Value");
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"EC\",\"state_topic\":\"smartgarden/sensors/ec\",\"unique_id\":\"smartgarden_ec\",\"device_class\":\"conductivity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
+        "{\"name\":\"EC\",\"state_topic\":\"smartgarden/sensors/ec\",\"unique_id\":\"smartgarden_ec\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
     publishDiscoveryConfig("sensor", "smartgarden_ec", buffer, "EC");
 
     snprintf(buffer, sizeof(buffer),
