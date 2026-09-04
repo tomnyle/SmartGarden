@@ -116,7 +116,6 @@ void setup() {
     client.setServer(MQTT_BROKER, MQTT_PORT);
     mqttService.begin(MQTT_USERNAME, MQTT_PASSWORD);
     mqttService.setRelayCommandCallback(onRelayCommand);
-    mqttService.loop(sensorSnapshot, relayState, RELAY_COUNT);
     
     Serial.println("========== Setup Complete ==========\n");
 }
@@ -171,7 +170,7 @@ void loop() {
         sensorSnapshot.nitrogen = n;
         sensorSnapshot.phosphorus = p;
         sensorSnapshot.potassium = k;
-        sensorSnapshot.timestamp = now;
+        sensorSnapshot.timestamp = (now == 0) ? 1 : now;
         
         // Print to serial
         Serial.println("\n========== SENSOR DATA ==========");

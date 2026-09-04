@@ -20,10 +20,10 @@ struct SwitchEntityConfig {
 };
 
 const SensorEntityConfig SENSOR_ENTITIES[] = {
-    {"Air Temperature", "smartgarden_air_temp", "smartgarden_air_temp", "smartgarden/sensors/air_temp", "C", "temperature", "measurement"},
+    {"Air Temperature", "smartgarden_air_temp", "smartgarden_air_temp", "smartgarden/sensors/air_temp", "°C", "temperature", "measurement"},
     {"Air Humidity", "smartgarden_air_humidity", "smartgarden_air_humidity", "smartgarden/sensors/air_humidity", "%", "humidity", "measurement"},
     {"Soil Moisture", "smartgarden_soil_moisture", "smartgarden_soil_moisture", "smartgarden/sensors/soil_moisture", "%", "moisture", "measurement"},
-    {"Soil Temperature", "smartgarden_soil_temp", "smartgarden_soil_temp", "smartgarden/sensors/soil_temp", "C", "temperature", "measurement"},
+    {"Soil Temperature", "smartgarden_soil_temp", "smartgarden_soil_temp", "smartgarden/sensors/soil_temp", "°C", "temperature", "measurement"},
     {"pH Value", "smartgarden_ph", "smartgarden_ph", "smartgarden/sensors/ph", "pH", nullptr, "measurement"},
     {"EC", "smartgarden_ec", "smartgarden_ec", "smartgarden/sensors/ec", "uS/cm", nullptr, "measurement"},
     {"Nitrogen", "smartgarden_nitrogen", "smartgarden_nitrogen", "smartgarden/sensors/nitrogen", "mg/kg", nullptr, "measurement"},
@@ -56,36 +56,52 @@ DiscoveryService::DiscoveryService(PubSubClient& client,
       model(model),
       availabilityTopic(availabilityTopic) {}
 
-void DiscoveryService::begin() {
+bool DiscoveryService::begin(size_t relayCount) {
     Serial.println("[MQTT Discovery] Publishing Home Assistant discovery...");
+    bool allPublished = true;
 
     for (const SensorEntityConfig& entity : SENSOR_ENTITIES) {
-        publishConfig("sensor",
-                      entity.objectId,
-                      buildSensorPayload(entity.name,
-                                         entity.objectId,
-                                         entity.uniqueId,
-                                         entity.stateTopic,
-                                         entity.unitOfMeasurement,
-                                         entity.deviceClass,
-                                         entity.stateClass));
+        allPublished = publishConfig("sensor",
+                                     entity.objectId,
+                                     buildSensorPayload(entity.name,
+                                                        entity.objectId,
+                                                        entity.uniqueId,
+                                                        entity.stateTopic,
+                                                        entity.unitOfMeasurement,
+                                                        entity.deviceClass,
+                                                        entity.stateClass)) && allPublished;
     }
 
-    for (const SwitchEntityConfig& entity : SWITCH_ENTITIES) {
-        publishConfig("switch",
-                      entity.objectId,
-                      buildSwitchPayload(entity.name,
-                                         entity.objectId,
-                                         entity.uniqueId,
-                                         entity.stateTopic,
-                                         entity.commandTopic));
+    const size_t switchCount = relayCount < (sizeof(SWITCH_ENTITIES) / sizeof(SWITCH_ENTITIES[0]))
+                                 ? relayCount
+                                 : (sizeof(SWITCH_ENTITIES) / sizeof(SWITCH_ENTITIES[0]));
+
+    for (size_t index = 0; index < switchCount; ++index) {
+        const SwitchEntityConfig& entity = SWITCH_ENTITIES[index];
+        allPublished = publishConfig("switch",
+                                     entity.objectId,
+                                     buildSwitchPayload(entity.name,
+                                                        entity.objectId,
+                                                        entity.uniqueId,
+                                                        entity.stateTopic,
+                                                        entity.commandTopic)) && allPublished;
     }
 
-    Serial.println("[MQTT Discovery] Discovery publish complete");
+    Serial.printf("[MQTT Discovery] Discovery publish %s\n", allPublished ? "complete" : "incomplete");
+    return allPublished;
 }
 
 bool DiscoveryService::publishConfig(const char* component, const char* objectId, const String& payload) {
     const String topic = String("homeassistant/") + component + "/" + objectId + "/config";
+    const size_t requiredSize = payload.length() + topic.length() + 16;
+    if (requiredSize > client.getBufferSize()) {
+        Serial.printf("[MQTT Discovery] FAILED %s (payload %u > buffer %u)\n",
+                      objectId,
+                      static_cast<unsigned int>(requiredSize),
+                      static_cast<unsigned int>(client.getBufferSize()));
+        return false;
+    }
+
     const bool published = client.publish(topic.c_str(), payload.c_str(), true);
 
     Serial.printf("[MQTT Discovery] %s %s\n",
@@ -100,16 +116,16 @@ String DiscoveryService::buildDeviceJson() const {
     payload.reserve(192);
     payload += "\"device\":{";
     payload += "\"identifiers\":[\"";
-    payload += deviceId;
+    payload += escapeJson(deviceId);
     payload += "\"],";
     payload += "\"name\":\"";
-    payload += deviceName;
+    payload += escapeJson(deviceName);
     payload += "\",";
     payload += "\"manufacturer\":\"";
-    payload += manufacturer;
+    payload += escapeJson(manufacturer);
     payload += "\",";
     payload += "\"model\":\"";
-    payload += model;
+    payload += escapeJson(model);
     payload += "\"";
     payload += "}";
     return payload;
@@ -118,10 +134,50 @@ String DiscoveryService::buildDeviceJson() const {
 String DiscoveryService::buildAvailabilityJson() const {
     String payload;
     payload.reserve(128);
-    payload += "\"availability\":[{\"topic\":\"";
-    payload += availabilityTopic;
-    payload += "\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\"}]";
+    payload += "\"availability_topic\":\"";
+    payload += escapeJson(availabilityTopic);
+    payload += "\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\"";
     return payload;
+}
+
+String DiscoveryService::escapeJson(const char* value) const {
+    String escaped;
+    if (value == nullptr) {
+        return escaped;
+    }
+
+    escaped.reserve(strlen(value) + 8);
+    while (*value != '\0') {
+        switch (*value) {
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\b':
+                escaped += "\\b";
+                break;
+            case '\f':
+                escaped += "\\f";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            case '\t':
+                escaped += "\\t";
+                break;
+            default:
+                escaped += *value;
+                break;
+        }
+        ++value;
+    }
+
+    return escaped;
 }
 
 String DiscoveryService::buildSensorPayload(const char* name,
@@ -135,30 +191,30 @@ String DiscoveryService::buildSensorPayload(const char* name,
     payload.reserve(512);
     payload += "{";
     payload += "\"name\":\"";
-    payload += name;
+    payload += escapeJson(name);
     payload += "\",";
     payload += "\"object_id\":\"";
-    payload += objectId;
+    payload += escapeJson(objectId);
     payload += "\",";
     payload += "\"unique_id\":\"";
-    payload += uniqueId;
+    payload += escapeJson(uniqueId);
     payload += "\",";
     payload += "\"state_topic\":\"";
-    payload += stateTopic;
+    payload += escapeJson(stateTopic);
     payload += "\",";
     if (unitOfMeasurement && unitOfMeasurement[0] != '\0') {
         payload += "\"unit_of_measurement\":\"";
-        payload += unitOfMeasurement;
+        payload += escapeJson(unitOfMeasurement);
         payload += "\",";
     }
     if (deviceClass && deviceClass[0] != '\0') {
         payload += "\"device_class\":\"";
-        payload += deviceClass;
+        payload += escapeJson(deviceClass);
         payload += "\",";
     }
     if (stateClass && stateClass[0] != '\0') {
         payload += "\"state_class\":\"";
-        payload += stateClass;
+        payload += escapeJson(stateClass);
         payload += "\",";
     }
     payload += buildAvailabilityJson();
@@ -177,20 +233,21 @@ String DiscoveryService::buildSwitchPayload(const char* name,
     payload.reserve(512);
     payload += "{";
     payload += "\"name\":\"";
-    payload += name;
+    payload += escapeJson(name);
     payload += "\",";
     payload += "\"object_id\":\"";
-    payload += objectId;
+    payload += escapeJson(objectId);
     payload += "\",";
     payload += "\"unique_id\":\"";
-    payload += uniqueId;
+    payload += escapeJson(uniqueId);
     payload += "\",";
     payload += "\"state_topic\":\"";
-    payload += stateTopic;
+    payload += escapeJson(stateTopic);
     payload += "\",";
     payload += "\"command_topic\":\"";
-    payload += commandTopic;
+    payload += escapeJson(commandTopic);
     payload += "\",";
+    payload += "\"device_class\":\"switch\",";
     payload += "\"payload_on\":\"ON\",";
     payload += "\"payload_off\":\"OFF\",";
     payload += buildAvailabilityJson();

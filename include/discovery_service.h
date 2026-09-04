@@ -13,7 +13,7 @@ public:
                      const char* model,
                      const char* availabilityTopic);
 
-    void begin();
+    bool begin(size_t relayCount);
 
 private:
     PubSubClient& client;
@@ -26,6 +26,7 @@ private:
     bool publishConfig(const char* component, const char* objectId, const String& payload);
     String buildDeviceJson() const;
     String buildAvailabilityJson() const;
+    String escapeJson(const char* value) const;
     String buildSensorPayload(const char* name,
                               const char* objectId,
                               const char* uniqueId,

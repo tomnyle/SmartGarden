@@ -31,10 +31,13 @@ MQTTService::MQTTService(PubSubClient& client, DiscoveryService& discoveryServic
       discoveryService(discoveryService),
       clientId(clientId),
       relayCallback(nullptr),
+      configuredRelayCount(0),
       wasConnected(false),
       discoveryPublishedThisSession(false),
       lastReconnectAttempt(0),
-      lastStatePublish(0) {
+      lastDiscoveryRetryAttempt(0),
+      lastStatePublish(0),
+      lastPublishedSnapshotTimestamp(0) {
     mqttUsername[0] = '\0';
     mqttPassword[0] = '\0';
     g_mqttService = this;
@@ -52,6 +55,8 @@ void MQTTService::begin(const char* username, const char* password) {
 }
 
 void MQTTService::loop(const SensorSnapshot& snapshot, const bool* relayStates, size_t relayCount) {
+    configuredRelayCount = relayCount;
+
     if (!client.connected()) {
         if (wasConnected) {
             wasConnected = false;
@@ -60,15 +65,33 @@ void MQTTService::loop(const SensorSnapshot& snapshot, const bool* relayStates, 
         }
 
         const unsigned long now = millis();
-        if (now - lastReconnectAttempt >= RECONNECT_INTERVAL_MS) {
-            lastReconnectAttempt = now;
-            reconnect(relayStates, relayCount);
+        if (lastReconnectAttempt == 0 || now - lastReconnectAttempt >= RECONNECT_INTERVAL_MS) {
+            lastReconnectAttempt = (now == 0) ? 1 : now;
+            reconnect(snapshot, relayStates, relayCount);
         }
         return;
     }
 
     client.loop();
-    publishPeriodicState(snapshot, relayStates, relayCount);
+    const unsigned long now = millis();
+
+    if (!discoveryPublishedThisSession && now - lastDiscoveryRetryAttempt >= RECONNECT_INTERVAL_MS) {
+        lastDiscoveryRetryAttempt = now;
+        discoveryPublishedThisSession = discoveryService.begin(configuredRelayCount);
+    }
+
+    if (!discoveryPublishedThisSession) {
+        return;
+    }
+
+    bool sensorPublishedThisLoop = false;
+    if (snapshot.timestamp != 0 && snapshot.timestamp != lastPublishedSnapshotTimestamp) {
+        publishSensorSnapshot(snapshot);
+        lastPublishedSnapshotTimestamp = snapshot.timestamp;
+        sensorPublishedThisLoop = true;
+    }
+
+    publishPeriodicState(snapshot, relayStates, relayCount, sensorPublishedThisLoop);
 }
 
 void MQTTService::setRelayCommandCallback(RelayCommandCallback callback) {
@@ -79,8 +102,9 @@ bool MQTTService::isConnected() const {
     return client.connected();
 }
 
-bool MQTTService::reconnect(const bool* relayStates, size_t relayCount) {
+bool MQTTService::reconnect(const SensorSnapshot& snapshot, const bool* relayStates, size_t relayCount) {
     Serial.print("[MQTT] Connecting...");
+    configuredRelayCount = relayCount;
 
     const bool connected = client.connect(clientId,
                                           mqttUsername,
@@ -101,8 +125,13 @@ bool MQTTService::reconnect(const bool* relayStates, size_t relayCount) {
     subscribeToTopics();
 
     if (!discoveryPublishedThisSession) {
-        discoveryService.begin();
-        discoveryPublishedThisSession = true;
+        discoveryPublishedThisSession = discoveryService.begin(configuredRelayCount);
+        lastDiscoveryRetryAttempt = millis();
+    }
+
+    if (discoveryPublishedThisSession && snapshot.timestamp != 0) {
+        publishSensorSnapshot(snapshot);
+        lastPublishedSnapshotTimestamp = snapshot.timestamp;
     }
 
     publishAllRelayStates(relayStates, relayCount);
@@ -111,7 +140,7 @@ bool MQTTService::reconnect(const bool* relayStates, size_t relayCount) {
 }
 
 void MQTTService::subscribeToTopics() {
-    for (uint8_t index = 0; index < 8; ++index) {
+    for (size_t index = 0; index < configuredRelayCount; ++index) {
         String topic = "smartgarden/relay/";
         topic += String(index + 1);
         topic += "/set";
@@ -195,18 +224,19 @@ bool MQTTService::publishSensorSnapshot(const SensorSnapshot& snapshot) {
     return allPublished;
 }
 
-void MQTTService::publishPeriodicState(const SensorSnapshot& snapshot, const bool* relayStates, size_t relayCount) {
-    if (snapshot.timestamp == 0) {
-        return;
-    }
-
+void MQTTService::publishPeriodicState(const SensorSnapshot& snapshot,
+                                       const bool* relayStates,
+                                       size_t relayCount,
+                                       bool sensorPublishedThisLoop) {
     const unsigned long now = millis();
-    if (now - lastStatePublish < STATE_PUBLISH_INTERVAL_MS) {
+    if (lastStatePublish != 0 && now - lastStatePublish < STATE_PUBLISH_INTERVAL_MS) {
         return;
     }
 
     lastStatePublish = now;
-    publishSensorSnapshot(snapshot);
+    if (!sensorPublishedThisLoop && snapshot.timestamp != 0) {
+        publishSensorSnapshot(snapshot);
+    }
     publishAllRelayStates(relayStates, relayCount);
 }
 
@@ -222,7 +252,9 @@ void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int len
     Serial.printf("[MQTT RX] %s = %s\n", topic, message);
 
     unsigned int relayNumber = 0;
-    if (sscanf(topic, "smartgarden/relay/%u/set", &relayNumber) != 1 || relayNumber < 1 || relayNumber > 8) {
+    if (sscanf(topic, "smartgarden/relay/%u/set", &relayNumber) != 1 ||
+        relayNumber < 1 ||
+        relayNumber > configuredRelayCount) {
         Serial.println("[MQTT] Ignored unsupported topic");
         return;
     }

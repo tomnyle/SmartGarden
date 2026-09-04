@@ -30,15 +30,21 @@ private:
     RelayCommandCallback relayCallback;
     char mqttUsername[64];
     char mqttPassword[64];
+    size_t configuredRelayCount;
     bool wasConnected;
     bool discoveryPublishedThisSession;
     unsigned long lastReconnectAttempt;
+    unsigned long lastDiscoveryRetryAttempt;
     unsigned long lastStatePublish;
+    unsigned long lastPublishedSnapshotTimestamp;
 
-    bool reconnect(const bool* relayStates, size_t relayCount);
+    bool reconnect(const SensorSnapshot& snapshot, const bool* relayStates, size_t relayCount);
     void subscribeToTopics();
     void publishAvailability(const char* state);
-    void publishPeriodicState(const SensorSnapshot& snapshot, const bool* relayStates, size_t relayCount);
+    void publishPeriodicState(const SensorSnapshot& snapshot,
+                              const bool* relayStates,
+                              size_t relayCount,
+                              bool sensorPublishedThisLoop);
     void onMessageReceived(char* topic, byte* payload, unsigned int length);
 
     friend void mqttMessageCallback(char* topic, byte* payload, unsigned int length);
