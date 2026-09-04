@@ -106,7 +106,7 @@ bool MQTTService::reconnect(const bool* relayStates, size_t relayCount) {
     }
 
     publishAllRelayStates(relayStates, relayCount);
-    lastStatePublish = millis() - STATE_PUBLISH_INTERVAL_MS;
+    lastStatePublish = millis();
     return true;
 }
 
@@ -196,6 +196,10 @@ bool MQTTService::publishSensorSnapshot(const SensorSnapshot& snapshot) {
 }
 
 void MQTTService::publishPeriodicState(const SensorSnapshot& snapshot, const bool* relayStates, size_t relayCount) {
+    if (snapshot.timestamp == 0) {
+        return;
+    }
+
     const unsigned long now = millis();
     if (now - lastStatePublish < STATE_PUBLISH_INTERVAL_MS) {
         return;
