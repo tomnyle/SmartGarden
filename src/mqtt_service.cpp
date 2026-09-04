@@ -37,10 +37,10 @@ void MQTTService::begin(const char* username, const char* password)
 
     client->setServer(mqttBroker, mqttPort);
     client->setCallback(mqttMessageCallback);
-    
+
     strncpy(mqttUsername, username, sizeof(mqttUsername) - 1);
     strncpy(mqttPassword, password, sizeof(mqttPassword) - 1);
-    
+
     Serial.println("[MQTTService] Initialized");
 }
 
@@ -55,13 +55,13 @@ void MQTTService::setCropSelectCallback(CropSelectCallback callback) {
 bool MQTTService::connect()
 {
     if (!client) return false;
-    
+
     if (client->connected()) {
         return true;
     }
-    
+
     Serial.printf("[MQTTService] Connecting to %s:%d...\n", mqttBroker, mqttPort);
-    
+
     if (client->connect(deviceId, mqttUsername, mqttPassword))
     {
         Serial.println("[MQTTService] Connected to MQTT broker");
@@ -88,7 +88,7 @@ bool MQTTService::isConnected() const
 void MQTTService::loop()
 {
     if (!client) return;
-    
+
     if (!client->connected())
     {
         if (millis() % 5000 == 0) {
@@ -106,14 +106,14 @@ bool MQTTService::publish(const char* topic, const char* payload)
     if (!client || !client->connected()) {
         return false;
     }
-    
+
     String fullTopic = String("smartgarden/") + String(deviceId) + "/" + String(topic);
     bool result = client->publish(fullTopic.c_str(), payload);
-    
+
     if (!result) {
         Serial.printf("[MQTTService] Publish failed: %s\n", fullTopic.c_str());
     }
-    
+
     return result;
 }
 
@@ -122,37 +122,36 @@ bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
     if (!client || !client->connected()) {
         return false;
     }
-    
+
     unsigned long now = millis();
     if (now - lastPublishTime < publishInterval) {
         return false;
     }
     lastPublishTime = now;
-    
-    // Publish individual sensor topics for Home Assistant
+
     char payload[64];
-    
+
     snprintf(payload, sizeof(payload), "%.1f", snapshot.airTemp);
-    client->publish((String("smartgarden/") + deviceId + "/sensors/air_temperature").c_str(), payload);
-    
+    client->publish((String("smartgarden/") + deviceId + "/sensors/air_temperature").c_str(), payload, true);
+
     snprintf(payload, sizeof(payload), "%.1f", snapshot.airHumidity);
-    client->publish((String("smartgarden/") + deviceId + "/sensors/air_humidity").c_str(), payload);
-    
+    client->publish((String("smartgarden/") + deviceId + "/sensors/air_humidity").c_str(), payload, true);
+
     snprintf(payload, sizeof(payload), "%.1f", snapshot.soilMoisture);
-    client->publish((String("smartgarden/") + deviceId + "/sensors/soil_moisture").c_str(), payload);
-    
+    client->publish((String("smartgarden/") + deviceId + "/sensors/soil_moisture").c_str(), payload, true);
+
     snprintf(payload, sizeof(payload), "%.1f", snapshot.soilTemp);
-    client->publish((String("smartgarden/") + deviceId + "/sensors/soil_temperature").c_str(), payload);
-    
+    client->publish((String("smartgarden/") + deviceId + "/sensors/soil_temperature").c_str(), payload, true);
+
     snprintf(payload, sizeof(payload), "%.1f", snapshot.ph);
-    client->publish((String("smartgarden/") + deviceId + "/sensors/ph").c_str(), payload);
-    
+    client->publish((String("smartgarden/") + deviceId + "/sensors/ph").c_str(), payload, true);
+
     snprintf(payload, sizeof(payload), "%u", snapshot.ec);
-    client->publish((String("smartgarden/") + deviceId + "/sensors/ec").c_str(), payload);
-    
+    client->publish((String("smartgarden/") + deviceId + "/sensors/ec").c_str(), payload, true);
+
     snprintf(payload, sizeof(payload), "%u", snapshot.nitrogen);
-    client->publish((String("smartgarden/") + deviceId + "/sensors/nitrogen").c_str(), payload);
-    
+    client->publish((String("smartgarden/") + deviceId + "/sensors/nitrogen").c_str(), payload, true);
+
     Serial.println("[MQTTService] Sensor data published");
     return true;
 }
@@ -162,23 +161,23 @@ bool MQTTService::publishRelayStatus(uint8_t relayIndex, bool state)
     if (!client || !client->connected()) {
         return false;
     }
-    
+
     const char* relayNames[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation"};
     if (relayIndex >= 6) return false;
-    
+
     String topic = String("smartgarden/") + deviceId + "/relays/" + relayNames[relayIndex];
-    return client->publish(topic.c_str(), state ? "ON" : "OFF");
+    return client->publish(topic.c_str(), state ? "ON" : "OFF", true);
 }
 
 bool MQTTService::publishAllRelayStatus(const RelayManager* relayMgr)
 {
     if (!relayMgr) return false;
-    
+
     for (uint8_t i = 0; i < 6; i++) {
         bool state = relayMgr->getRelayState(i);
         publishRelayStatus(i, state);
     }
-    
+
     return true;
 }
 
@@ -187,14 +186,14 @@ bool MQTTService::publishCropList()
     if (!client || !client->connected()) {
         return false;
     }
-    
+
     CropProfileStore::initialize();
     uint8_t count = 0;
     const CropProfile* crops = CropProfileStore::getAllCrops(count);
-    
+
     char payload[1024];
     strcpy(payload, "[");
-    
+
     for (uint8_t i = 0; i < count; i++) {
         if (i > 0) strcat(payload, ",");
         char crop[128];
@@ -202,10 +201,10 @@ bool MQTTService::publishCropList()
         strcat(payload, crop);
     }
     strcat(payload, "]");
-    
+
     String topic = String("smartgarden/") + deviceId + "/crop/available";
-    bool result = client->publish(topic.c_str(), payload);
-    
+    bool result = client->publish(topic.c_str(), payload, true);
+
     if (result) {
         Serial.println("[MQTTService] Crop list published");
     }
@@ -217,9 +216,9 @@ bool MQTTService::publishCurrentCrop(const CropProfile* profile)
     if (!client || !client->connected() || !profile) {
         return false;
     }
-    
+
     String topic = String("smartgarden/") + deviceId + "/crop/current";
-    return client->publish(topic.c_str(), profile->name);
+    return client->publish(topic.c_str(), profile->name, true);
 }
 
 bool MQTTService::publishStatus(const char* status)
@@ -227,9 +226,9 @@ bool MQTTService::publishStatus(const char* status)
     if (!client || !client->connected()) {
         return false;
     }
-    
+
     String topic = String("smartgarden/") + deviceId + "/status";
-    return client->publish(topic.c_str(), status);
+    return client->publish(topic.c_str(), status, true);
 }
 
 bool MQTTService::publishUptime(unsigned long uptime)
@@ -237,31 +236,28 @@ bool MQTTService::publishUptime(unsigned long uptime)
     if (!client || !client->connected()) {
         return false;
     }
-    
+
     char payload[32];
     snprintf(payload, sizeof(payload), "%lu", uptime / 1000);
-    
+
     String topic = String("smartgarden/") + deviceId + "/uptime";
-    return client->publish(topic.c_str(), payload);
+    return client->publish(topic.c_str(), payload, true);
 }
 
 void MQTTService::subscribeToTopics()
 {
     if (!client) return;
-    
+
     String baseTopic = String("smartgarden/") + deviceId + "/";
-    
-    // Subscribe to relay commands
+
     client->subscribe((baseTopic + "relays/fan/set").c_str());
     client->subscribe((baseTopic + "relays/heater/set").c_str());
     client->subscribe((baseTopic + "relays/cooler/set").c_str());
     client->subscribe((baseTopic + "relays/humidifier/set").c_str());
     client->subscribe((baseTopic + "relays/dehumidifier/set").c_str());
     client->subscribe((baseTopic + "relays/irrigation/set").c_str());
-    
-    // Subscribe to crop selection
     client->subscribe((baseTopic + "crop/select").c_str());
-    
+
     Serial.println("[MQTTService] Subscribed to topics");
 }
 
@@ -269,23 +265,22 @@ void MQTTService::handleRelayCommand(const char* relayName, const char* payload)
 {
     const char* relayNames[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation"};
     uint8_t relayIndex = 0xFF;
-    
+
     for (uint8_t i = 0; i < 6; i++) {
         if (strcmp(relayName, relayNames[i]) == 0) {
             relayIndex = i;
             break;
         }
     }
-    
+
     if (relayIndex == 0xFF) {
         Serial.printf("[MQTTService] Unknown relay: %s\n", relayName);
         return;
     }
-    
+
     bool state = (strcmp(payload, "ON") == 0 || strcmp(payload, "1") == 0);
-    
     Serial.printf("[MQTTService] Relay command: %s = %s\n", relayName, state ? "ON" : "OFF");
-    
+
     if (relayCallback) {
         relayCallback(relayIndex, state);
     }
@@ -294,7 +289,7 @@ void MQTTService::handleRelayCommand(const char* relayName, const char* payload)
 void MQTTService::handleCropSelect(const char* payload)
 {
     Serial.printf("[MQTTService] Crop select: %s\n", payload);
-    
+
     if (cropCallback) {
         cropCallback(payload);
     }
@@ -302,19 +297,17 @@ void MQTTService::handleCropSelect(const char* payload)
 
 void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int length)
 {
-    // Null-terminate payload
     char message[256];
     if (length >= sizeof(message)) {
         length = sizeof(message) - 1;
     }
     strncpy(message, (char*)payload, length);
     message[length] = '\0';
-    
+
     Serial.printf("[MQTTService] Message: %s = %s\n", topic, message);
-    
-    // Parse topic and route to handlers
+
     String topicStr(topic);
-    
+
     if (topicStr.indexOf("/relays/") > 0) {
         if (topicStr.indexOf("/fan/set") > 0) {
             handleRelayCommand("fan", message);
@@ -339,71 +332,74 @@ void MQTTService::publishDiscoveryMessages()
     if (!client || !client->connected()) {
         return;
     }
-    
+
     Serial.println("[MQTTService] Publishing Home Assistant discovery messages");
-    
-    String discoveryPrefix = "homeassistant";
-    String deviceName = "SmartGarden";
-    
-    // Device info for grouping
-    char deviceInfo[256];
-    snprintf(deviceInfo, sizeof(deviceInfo),
-        "\"identifiers\":[\"smartgarden\"],\"manufacturer\":\"DIY\",\"model\":\"ESP32\",\"name\":\"%s\",\"sw_version\":\"1.0.0\"",
-        deviceName.c_str());
-    
-    // ===== SENSORS =====
-    
-    // Air Temperature Sensor
-    char tempConfig[1024];
-    snprintf(tempConfig, sizeof(tempConfig),
-        "{\"device\":{%s},\"device_class\":\"temperature\",\"name\":\"SmartGarden Air Temperature\",\"state_class\":\"measurement\",\"state_topic\":\"smartgarden/%s/sensors/air_temperature\",\"unique_id\":\"smartgarden_air_temp\",\"unit_of_measurement\":\"°C\",\"value_template\":\"{{ value }}\",\"platform\":\"mqtt\"}",
-        deviceInfo, deviceId);
-    client->publish((discoveryPrefix + "/sensor/smartgarden_air_temp/config").c_str(), tempConfig, true);
-    
-    // Air Humidity Sensor
-    char humidConfig[1024];
-    snprintf(humidConfig, sizeof(humidConfig),
-        "{\"device\":{%s},\"device_class\":\"humidity\",\"name\":\"SmartGarden Air Humidity\",\"state_class\":\"measurement\",\"state_topic\":\"smartgarden/%s/sensors/air_humidity\",\"unique_id\":\"smartgarden_air_humidity\",\"unit_of_measurement\":\"%%\",\"value_template\":\"{{ value }}\",\"platform\":\"mqtt\"}",
-        deviceInfo, deviceId);
-    client->publish((discoveryPrefix + "/sensor/smartgarden_air_humidity/config").c_str(), humidConfig, true);
-    
-    // Soil Moisture Sensor
-    char soilConfig[1024];
-    snprintf(soilConfig, sizeof(soilConfig),
-        "{\"device\":{%s},\"device_class\":\"moisture\",\"name\":\"SmartGarden Soil Moisture\",\"state_class\":\"measurement\",\"state_topic\":\"smartgarden/%s/sensors/soil_moisture\",\"unique_id\":\"smartgarden_soil_moisture\",\"unit_of_measurement\":\"%%\",\"value_template\":\"{{ value }}\",\"platform\":\"mqtt\"}",
-        deviceInfo, deviceId);
-    client->publish((discoveryPrefix + "/sensor/smartgarden_soil_moisture/config").c_str(), soilConfig, true);
-    
-    // Soil Temperature Sensor
-    char soilTempConfig[1024];
-    snprintf(soilTempConfig, sizeof(soilTempConfig),
-        "{\"device\":{%s},\"device_class\":\"temperature\",\"name\":\"SmartGarden Soil Temperature\",\"state_class\":\"measurement\",\"state_topic\":\"smartgarden/%s/sensors/soil_temperature\",\"unique_id\":\"smartgarden_soil_temp\",\"unit_of_measurement\":\"°C\",\"value_template\":\"{{ value }}\",\"platform\":\"mqtt\"}",
-        deviceInfo, deviceId);
-    client->publish((discoveryPrefix + "/sensor/smartgarden_soil_temp/config").c_str(), soilTempConfig, true);
-    
-    // ===== SWITCHES (RELAYS) =====
-    
-    const char* relayNames[] = {"Circulation Fan", "Heater", "Cooler", "Humidifier", "Dehumidifier", "Irrigation"};
-    const char* relayIds[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation"};
-    
-    for (uint8_t i = 0; i < 6; i++) {
-        char switchConfig[1024];
-        snprintf(switchConfig, sizeof(switchConfig),
-            "{\"device\":{%s},\"name\":\"SmartGarden %s\",\"payload_off\":\"OFF\",\"payload_on\":\"ON\",\"state_topic\":\"smartgarden/%s/relays/%s\",\"command_topic\":\"smartgarden/%s/relays/%s/set\",\"unique_id\":\"smartgarden_%s\",\"platform\":\"mqtt\"}",
-            deviceInfo, relayNames[i], deviceId, relayIds[i], deviceId, relayIds[i], relayIds[i]);
-        
-        String switchTopic = discoveryPrefix + "/switch/smartgarden_" + relayIds[i] + "/config";
-        client->publish(switchTopic.c_str(), switchConfig, true);
+
+    const char* deviceInfo = R"({"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32","name":"Smart Garden"})";
+    char buffer[1024];
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Air Temperature\",\"unique_id\":\"smartgarden_air_temp\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"device\":%s}",
+        deviceInfo);
+    client->publish("homeassistant/sensor/smartgarden_air_temp/config", buffer, true);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Air Humidity\",\"unique_id\":\"smartgarden_air_humidity\",\"state_topic\":\"smartgarden/sensors/air_humidity\",\"device_class\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"device\":%s}",
+        deviceInfo);
+    client->publish("homeassistant/sensor/smartgarden_air_humidity/config", buffer, true);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Soil Moisture\",\"unique_id\":\"smartgarden_soil_moisture\",\"state_topic\":\"smartgarden/sensors/soil_moisture\",\"device_class\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"device\":%s}",
+        deviceInfo);
+    client->publish("homeassistant/sensor/smartgarden_soil_moisture/config", buffer, true);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Soil Temperature\",\"unique_id\":\"smartgarden_soil_temp\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"device\":%s}",
+        deviceInfo);
+    client->publish("homeassistant/sensor/smartgarden_soil_temp/config", buffer, true);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"pH Value\",\"unique_id\":\"smartgarden_ph\",\"state_topic\":\"smartgarden/sensors/ph\",\"state_class\":\"measurement\",\"device\":%s}",
+        deviceInfo);
+    client->publish("homeassistant/sensor/smartgarden_ph/config", buffer, true);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"EC\",\"unique_id\":\"smartgarden_ec\",\"state_topic\":\"smartgarden/sensors/ec\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"device\":%s}",
+        deviceInfo);
+    client->publish("homeassistant/sensor/smartgarden_ec/config", buffer, true);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Nitrogen\",\"unique_id\":\"smartgarden_nitrogen\",\"state_topic\":\"smartgarden/sensors/nitrogen\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
+        deviceInfo);
+    client->publish("homeassistant/sensor/smartgarden_nitrogen/config", buffer, true);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Phosphorus\",\"unique_id\":\"smartgarden_phosphorus\",\"state_topic\":\"smartgarden/sensors/phosphorus\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
+        deviceInfo);
+    client->publish("homeassistant/sensor/smartgarden_phosphorus/config", buffer, true);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Potassium\",\"unique_id\":\"smartgarden_potassium\",\"state_topic\":\"smartgarden/sensors/potassium\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
+        deviceInfo);
+    client->publish("homeassistant/sensor/smartgarden_potassium/config", buffer, true);
+
+    const char* relayNames[] = {"Circulation Fan", "Heater", "Cooler", "Humidifier", "Dehumidifier", "Irrigation", "Relay 7", "Relay 8"};
+    const char* relayIds[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation", "relay7", "relay8"};
+
+    for (uint8_t i = 0; i < 8; i++) {
+        snprintf(buffer, sizeof(buffer),
+            "{\"name\":\"%s\",\"unique_id\":\"smartgarden_%s\",\"state_topic\":\"smartgarden/relay/%u/state\",\"command_topic\":\"smartgarden/relay/%u/set\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"device\":%s}",
+            relayNames[i], relayIds[i], i + 1, i + 1, deviceInfo);
+
+        char topic[128];
+        snprintf(topic, sizeof(topic), "homeassistant/switch/smartgarden_%s/config", relayIds[i]);
+        client->publish(topic, buffer, true);
     }
-    
-    // ===== SELECT (Crop Profile) =====
-    
-    char selectConfig[1024];
-    snprintf(selectConfig, sizeof(selectConfig),
-        "{\"device\":{%s},\"name\":\"SmartGarden Crop Profile\",\"command_topic\":\"smartgarden/%s/crop/select\",\"state_topic\":\"smartgarden/%s/crop/current\",\"unique_id\":\"smartgarden_crop\",\"options\":[\"Sâm\",\"Cà chua\",\"Dâu tây\",\"Rau mầm\",\"Cải kale\",\"Bánh chua\",\"Thơm\",\"Xà lách\",\"Ớt\",\"Cúc hoa mi\",\"Chanh\",\"Bạc hà\",\"Tỏi\"],\"platform\":\"mqtt\"}",
-        deviceInfo, deviceId, deviceId);
-    
-    client->publish((discoveryPrefix + "/select/smartgarden_crop/config").c_str(), selectConfig, true);
-    
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Crop Profile\",\"unique_id\":\"smartgarden_crop\",\"command_topic\":\"smartgarden/%s/crop/select\",\"state_topic\":\"smartgarden/%s/crop/current\",\"options\":[\"Sâm\",\"Cà chua\",\"Dâu tây\",\"Rau mầm\",\"Cải kale\",\"Bánh chua\",\"Thơm\",\"Xà lách\",\"Ớt\",\"Cúc hoa mi\",\"Chanh\",\"Bạc hà\",\"Tỏi\"],\"device\":%s}",
+        deviceId, deviceId, deviceInfo);
+    client->publish("homeassistant/select/smartgarden_crop/config", buffer, true);
+
     Serial.println("[MQTTService] Discovery messages published!");
 }
