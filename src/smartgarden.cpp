@@ -61,6 +61,13 @@ void setRelay(int index, bool state) {
     Serial.printf("[Relay] Relay %d -> %s\n", index + 1, state ? "ON" : "OFF");
 }
 
+void publishRelayStateOnly(int index) {
+    if (index < 0 || index >= RELAY_COUNT) return;
+
+    String stateTopic = "smartgarden/relay/" + String(index + 1) + "/state";
+    client.publish(stateTopic.c_str(), relayState[index] ? "ON" : "OFF", true);
+}
+
 // ================= MQTT CALLBACK =================
 void callback(char* topic, byte* payload, unsigned int length) {
     String msg = "";
@@ -83,99 +90,67 @@ void callback(char* topic, byte* payload, unsigned int length) {
 // ================= PUBLISH DISCOVERY MESSAGES =================
 void publishDiscoveryMessages() {
     Serial.println("\n[MQTT Discovery] Publishing Home Assistant discovery...");
-    
-    char buffer[1024];
-    
-    // Device info (used by all entities)
-    const char* deviceInfo = R"(,"device":{"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32","name":"Smart Garden"})";
-    
+
+    auto publishDiscoveryConfig = [&](const char* component, const char* objectId, const char* payload, const char* label) {
+        String topic = String(discoveryPrefix) + "/" + component + "/" + objectId + "/config";
+        if (client.publish(topic.c_str(), payload, true)) {
+            Serial.printf("  OK %s\n", label);
+        } else {
+            Serial.printf("  FAILED %s\n", label);
+        }
+        delay(50);
+    };
+
+    char buffer[768];
+
     // ===== SENSORS =====
-    
-    // Air Temperature
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Temperature\",\"unique_id\":\"smartgarden_air_temp\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"unit_of_measurement\":\"C\",\"device_class\":\"temperature\",\"state_class\":\"measurement\"%s}",
-        deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_air_temp/config").c_str(), buffer, true);
-    delay(100);
-    Serial.println("  OK Air Temperature");
-    
-    // Air Humidity
+        "{\"name\":\"Air Temperature\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"unique_id\":\"smartgarden_air_temp\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"C\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
+    publishDiscoveryConfig("sensor", "smartgarden_air_temp", buffer, "Air Temperature");
+
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Humidity\",\"unique_id\":\"smartgarden_air_humidity\",\"state_topic\":\"smartgarden/sensors/air_humidity\",\"unit_of_measurement\":\"%%\",\"device_class\":\"humidity\",\"state_class\":\"measurement\"%s}",
-        deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_air_humidity/config").c_str(), buffer, true);
-    delay(100);
-    Serial.println("  OK Air Humidity");
-    
-    // Soil Moisture
+        "{\"name\":\"Air Humidity\",\"state_topic\":\"smartgarden/sensors/air_humidity\",\"unique_id\":\"smartgarden_air_humidity\",\"device_class\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
+    publishDiscoveryConfig("sensor", "smartgarden_air_humidity", buffer, "Air Humidity");
+
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Moisture\",\"unique_id\":\"smartgarden_soil_moisture\",\"state_topic\":\"smartgarden/sensors/soil_moisture\",\"unit_of_measurement\":\"%%\",\"device_class\":\"moisture\",\"state_class\":\"measurement\"%s}",
-        deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_soil_moisture/config").c_str(), buffer, true);
-    delay(100);
-    Serial.println("  OK Soil Moisture");
-    
-    // Soil Temperature
+        "{\"name\":\"Soil Moisture\",\"state_topic\":\"smartgarden/sensors/soil_moisture\",\"unique_id\":\"smartgarden_soil_moisture\",\"device_class\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
+    publishDiscoveryConfig("sensor", "smartgarden_soil_moisture", buffer, "Soil Moisture");
+
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Temperature\",\"unique_id\":\"smartgarden_soil_temp\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"unit_of_measurement\":\"C\",\"device_class\":\"temperature\",\"state_class\":\"measurement\"%s}",
-        deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_soil_temp/config").c_str(), buffer, true);
-    delay(100);
-    Serial.println("  OK Soil Temperature");
-    
-    // pH
+        "{\"name\":\"Soil Temperature\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"unique_id\":\"smartgarden_soil_temp\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"C\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
+    publishDiscoveryConfig("sensor", "smartgarden_soil_temp", buffer, "Soil Temperature");
+
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"pH Value\",\"unique_id\":\"smartgarden_ph\",\"state_topic\":\"smartgarden/sensors/ph\",\"unit_of_measurement\":\"pH\",\"state_class\":\"measurement\"%s}",
-        deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_ph/config").c_str(), buffer, true);
-    delay(100);
-    Serial.println("  OK pH Value");
-    
-    // EC
+        "{\"name\":\"pH Value\",\"state_topic\":\"smartgarden/sensors/ph\",\"unique_id\":\"smartgarden_ph\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"pH\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
+    publishDiscoveryConfig("sensor", "smartgarden_ph", buffer, "pH Value");
+
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"EC\",\"unique_id\":\"smartgarden_ec\",\"state_topic\":\"smartgarden/sensors/ec\",\"unit_of_measurement\":\"uS/cm\",\"state_class\":\"measurement\"%s}",
-        deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_ec/config").c_str(), buffer, true);
-    delay(100);
-    Serial.println("  OK EC");
-    
-    // Nitrogen
+        "{\"name\":\"EC\",\"state_topic\":\"smartgarden/sensors/ec\",\"unique_id\":\"smartgarden_ec\",\"device_class\":\"conductivity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
+    publishDiscoveryConfig("sensor", "smartgarden_ec", buffer, "EC");
+
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Nitrogen\",\"unique_id\":\"smartgarden_nitrogen\",\"state_topic\":\"smartgarden/sensors/nitrogen\",\"unit_of_measurement\":\"mg/kg\",\"state_class\":\"measurement\"%s}",
-        deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_nitrogen/config").c_str(), buffer, true);
-    delay(100);
-    Serial.println("  OK Nitrogen");
-    
-    // Phosphorus
+        "{\"name\":\"Nitrogen\",\"state_topic\":\"smartgarden/sensors/nitrogen\",\"unique_id\":\"smartgarden_nitrogen\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
+    publishDiscoveryConfig("sensor", "smartgarden_nitrogen", buffer, "Nitrogen");
+
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Phosphorus\",\"unique_id\":\"smartgarden_phosphorus\",\"state_topic\":\"smartgarden/sensors/phosphorus\",\"unit_of_measurement\":\"mg/kg\",\"state_class\":\"measurement\"%s}",
-        deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_phosphorus/config").c_str(), buffer, true);
-    delay(100);
-    Serial.println("  OK Phosphorus");
-    
-    // Potassium
+        "{\"name\":\"Phosphorus\",\"state_topic\":\"smartgarden/sensors/phosphorus\",\"unique_id\":\"smartgarden_phosphorus\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
+    publishDiscoveryConfig("sensor", "smartgarden_phosphorus", buffer, "Phosphorus");
+
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Potassium\",\"unique_id\":\"smartgarden_potassium\",\"state_topic\":\"smartgarden/sensors/potassium\",\"unit_of_measurement\":\"mg/kg\",\"state_class\":\"measurement\"%s}",
-        deviceInfo);
-    client.publish((String(discoveryPrefix) + "/sensor/smartgarden_potassium/config").c_str(), buffer, true);
-    delay(100);
-    Serial.println("  OK Potassium");
-    
+        "{\"name\":\"Potassium\",\"state_topic\":\"smartgarden/sensors/potassium\",\"unique_id\":\"smartgarden_potassium\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}");
+    publishDiscoveryConfig("sensor", "smartgarden_potassium", buffer, "Potassium");
+
     // ===== SWITCHES (RELAYS) =====
-    
     for (int i = 0; i < RELAY_COUNT; i++) {
         snprintf(buffer, sizeof(buffer),
-            "{\"name\":\"%s\",\"unique_id\":\"smartgarden_relay_%d\",\"state_topic\":\"smartgarden/relay/%d/state\",\"command_topic\":\"smartgarden/relay/%d/set\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"device_class\":\"switch\"%s}",
-            relayNames[i], i + 1, i + 1, i + 1, deviceInfo);
-        
-        String switchTopic = String(discoveryPrefix) + "/switch/smartgarden_relay_" + String(i + 1) + "/config";
-        client.publish(switchTopic.c_str(), buffer, true);
-        delay(100);
-        Serial.printf("  OK Relay %d: %s\n", i + 1, relayNames[i]);
+            "{\"name\":\"Relay %d: %s\",\"state_topic\":\"smartgarden/relay/%d/state\",\"command_topic\":\"smartgarden/relay/%d/set\",\"unique_id\":\"smartgarden_relay_%d\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"device\":{\"identifiers\":[\"smartgarden_esp32\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32\"}}",
+            i + 1, relayNames[i], i + 1, i + 1, i + 1);
+
+        String objectId = "smartgarden_relay_" + String(i + 1);
+        String label = "Relay " + String(i + 1) + ": " + relayNames[i];
+        publishDiscoveryConfig("switch", objectId.c_str(), buffer, label.c_str());
     }
-    
+
     Serial.println("[MQTT Discovery] All discovery messages published!\n");
 }
 
@@ -198,7 +173,7 @@ void reconnect() {
             
             // Publish initial relay states
             for (int i = 0; i < RELAY_COUNT; i++) {
-                setRelay(i, relayState[i]);
+                publishRelayStateOnly(i);
             }
         } else {
             Serial.printf(" Failed (code=%d), retry in 3s\n", client.state());
@@ -259,6 +234,7 @@ void setup() {
     // Setup MQTT
     Serial.printf("[Setup] Initializing MQTT: %s:%d\n", mqtt_server, mqtt_port);
     client.setServer(mqtt_server, mqtt_port);
+    client.setBufferSize(1024);
     client.setCallback(callback);
     reconnect();
     
