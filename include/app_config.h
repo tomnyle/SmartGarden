@@ -6,6 +6,9 @@
 
 #define APP_VERSION "1.0.0"
 #define APP_NAME "SmartGarden"
+#define DEVICE_ID "smartgarden"
+#define FIRMWARE_VERSION APP_VERSION
+#define MQTT_ROOT_TOPIC "smartgarden"
 #define DEBUG_MODE 1
 
 #define WIFI_SSID "Le Danh"
@@ -14,6 +17,7 @@
 
 // Home Assistant MQTT Broker
 #define MQTT_BROKER "192.168.100.168"
+#define MQTT_HOST MQTT_BROKER
 #define MQTT_PORT 1883
 #define MQTT_USERNAME "homer"
 #define MQTT_PASSWORD "Danh@@@1992"
@@ -32,7 +36,7 @@
 #define CLIMATE_DEHUMIDIFIER_RELAY_INDEX 4
 
 #define IRRIGATION_RELAY_INDEX 5
-#define IRRIGATION_MAX_DURATION 3600000
+#define IRRIGATION_MAX_DURATION 3600000UL
 #define IRRIGATION_CHECK_INTERVAL 1000
 
 #define LOG_INTERVAL 60000

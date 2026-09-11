@@ -123,7 +123,7 @@ Payload: "lettuce"  (hoặc: tomato, ginseng, salvia, morinda, strawberry, v.v.)
 ```
 SmartGarden/
 ├── src/
-│   └── smartgarden.ino          # Main firmware
+│   └── main.cpp                 # Main firmware
 ├── include/
 │   ├── config.h                  # Cấu hình tập trung
 │   ├── crop_profiles.h           # Định nghĩa loại cây
