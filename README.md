@@ -72,45 +72,45 @@ SmartGarden là một hệ thống IoT hoàn chỉnh cho phép quản lý **13 l
 
 ## 📡 MQTT Topics
 
-SmartGarden publishes runtime state under a stable device-scoped root:
+SmartGarden publishes runtime state under a stable root:
 
 ```text
-smartgarden/<device_id>/...
+smartgarden/...
 ```
 
 Home Assistant discovery uses:
 
 ```text
-homeassistant/<domain>/<device_id>/<object_id>/config
+homeassistant/<domain>/smartgarden/<object_id>/config
 ```
 
 ```
 # Quản lý Cây
-smartgarden/<device_id>/crop/available    → Danh sách tất cả loại cây
-smartgarden/<device_id>/crop/select       → Chọn loại cây
-smartgarden/<device_id>/crop/current      → Loại cây hiện tại
+smartgarden/crop/available    → Danh sách tất cả loại cây
+smartgarden/crop/select       → Chọn loại cây
+smartgarden/crop/current      → Loại cây hiện tại
 
 # Dữ liệu Cảm Biến
-smartgarden/<device_id>/air_temperature   → Nhiệt độ không khí (°C)
-smartgarden/<device_id>/air_humidity      → Độ ẩm không khí (%)
-smartgarden/<device_id>/soil_moisture     → Độ ẩm đất (%)
-smartgarden/<device_id>/soil_temperature  → Nhiệt độ đất (°C)
-smartgarden/<device_id>/ph                → Giá trị pH
-smartgarden/<device_id>/ec                → Độ dẫn điện (uS/cm)
-smartgarden/<device_id>/nitrogen          → Nitrogen (mg/kg)
-smartgarden/<device_id>/phosphorus        → Phosphorus (mg/kg)
-smartgarden/<device_id>/potassium         → Potassium (mg/kg)
+smartgarden/air_temperature   → Nhiệt độ không khí (°C)
+smartgarden/air_humidity      → Độ ẩm không khí (%)
+smartgarden/soil_moisture     → Độ ẩm đất (%)
+smartgarden/soil_temperature  → Nhiệt độ đất (°C)
+smartgarden/ph                → Giá trị pH
+smartgarden/ec                → Độ dẫn điện (uS/cm)
+smartgarden/nitrogen          → Nitrogen (mg/kg)
+smartgarden/phosphorus        → Phosphorus (mg/kg)
+smartgarden/potassium         → Potassium (mg/kg)
 
 # Relay & Điều Khiển
-smartgarden/<device_id>/fan/state          → Trạng thái relay quạt
-smartgarden/<device_id>/fan/set            → Điều khiển relay quạt
-smartgarden/<device_id>/heater/state       → Trạng thái relay sưởi
-smartgarden/<device_id>/heater/set         → Điều khiển relay sưởi
-smartgarden/<device_id>/status             → online/offline (retained, LWT)
+smartgarden/fan/state          → Trạng thái relay quạt
+smartgarden/fan/set            → Điều khiển relay quạt
+smartgarden/heater/state       → Trạng thái relay sưởi
+smartgarden/heater/set         → Điều khiển relay sưởi
+smartgarden/status             → online/offline (retained, LWT)
 
 # Chẩn đoán
-smartgarden/<device_id>/firmware   → Phiên bản firmware
-smartgarden/<device_id>/uptime     → Thời gian chạy (giây)
+smartgarden/firmware   → Phiên bản firmware
+smartgarden/uptime     → Thời gian chạy (giây)
 ```
 
 ## 🔧 Cấu Hình

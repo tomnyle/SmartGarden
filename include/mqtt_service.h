@@ -59,6 +59,7 @@ private:
     const char* mqttBroker;
     int mqttPort;
     char deviceId[64];
+    char clientId[64];
     char mqttUsername[64];
     char mqttPassword[64];
     bool connected;

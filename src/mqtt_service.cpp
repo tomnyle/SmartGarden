@@ -64,7 +64,9 @@ MQTTService::MQTTService(const char* broker, int port)
       relayCallback(nullptr), cropCallback(nullptr),
       sensorManager(nullptr), relayManager(nullptr), currentCrop(nullptr)
 {
-    snprintf(deviceId, sizeof(deviceId), "smartgarden_%012llx", (unsigned long long)ESP.getEfuseMac());
+    strncpy(deviceId, "smartgarden", sizeof(deviceId) - 1);
+    deviceId[sizeof(deviceId) - 1] = '\0';
+    snprintf(clientId, sizeof(clientId), "smartgarden_%012llx", (unsigned long long)ESP.getEfuseMac());
     memset(mqttUsername, 0, sizeof(mqttUsername));
     memset(mqttPassword, 0, sizeof(mqttPassword));
     g_mqttService = this;
@@ -112,7 +114,7 @@ bool MQTTService::connect()
 
     Serial.printf("[MQTTService] Connecting to %s:%d...\n", mqttBroker, mqttPort);
 
-    if (client.connect(deviceId,
+    if (client.connect(clientId,
                        mqttUsername,
                        mqttPassword,
                        getStatusTopic().c_str(),
@@ -169,7 +171,7 @@ bool MQTTService::publishRaw(const char* topic, const char* payload, bool retain
 
 String MQTTService::getBaseTopic() const
 {
-    return "smartgarden/" + String(deviceId);
+    return "smartgarden";
 }
 
 String MQTTService::getStatusTopic() const
