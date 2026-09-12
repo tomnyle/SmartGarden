@@ -14,18 +14,15 @@ void publishCropList();
 // Publish current active crop configuration to MQTT
 inline void publishCurrentCropConfig()
 {
-    // Publish status
-    client.publish("smartgarden/system/status", "online", true);
+    client.publish("smartgarden/status", "online", true);
 }
 
 // Publish list of available crops to MQTT
 inline void publishCropList()
 {
-    // Get available crops (simplified)
     char buffer[128];
     snprintf(buffer, sizeof(buffer), "Smart Garden Ready - %u crops available", 13);
-    client.publish("smartgarden/status", buffer, true);
-    client.publish("smartgarden/system/status", "online", true);
+    client.publish("smartgarden/crop/available", buffer, true);
 }
 
 #endif
