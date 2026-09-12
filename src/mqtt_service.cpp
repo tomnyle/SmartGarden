@@ -2,24 +2,53 @@
 #include "garden_profile.h"
 #include <WiFi.h>
 #include "app_config.h"
+#include "smartgarden_topics.h"
 
 static MQTTService* g_mqttService = nullptr;
 
 namespace {
 
-constexpr uint8_t RELAY_COUNT = 8;
 constexpr unsigned long MQTT_RETRY_INTERVAL_MS = MQTT_RECONNECT_INTERVAL;
 
-const char* const RELAY_OBJECT_IDS[RELAY_COUNT] = {
-    "fan",
-    "heater",
-    "cooler",
-    "humidifier",
-    "dehumidifier",
-    "irrigation",
-    "relay7",
-    "relay8"
-};
+void appendEscapedJsonString(char* buffer, size_t bufferSize, size_t& offset, const char* value)
+{
+    for (const unsigned char* ptr = reinterpret_cast<const unsigned char*>(value);
+         *ptr != '\0' && offset + 1 < bufferSize;
+         ++ptr) {
+        const char* replacement = nullptr;
+        switch (*ptr) {
+            case '\"':
+                replacement = "\\\"";
+                break;
+            case '\\':
+                replacement = "\\\\";
+                break;
+            case '\b':
+                replacement = "\\b";
+                break;
+            case '\f':
+                replacement = "\\f";
+                break;
+            case '\n':
+                replacement = "\\n";
+                break;
+            case '\r':
+                replacement = "\\r";
+                break;
+            case '\t':
+                replacement = "\\t";
+                break;
+            default:
+                buffer[offset++] = static_cast<char>(*ptr);
+                continue;
+        }
+
+        for (size_t i = 0; replacement[i] != '\0' && offset + 1 < bufferSize; ++i) {
+            buffer[offset++] = replacement[i];
+        }
+    }
+    buffer[offset] = '\0';
+}
 
 } // namespace
 
@@ -183,33 +212,39 @@ bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
     if (!client.connected()) return false;
 
     char payload[32];
-
-    snprintf(payload, sizeof(payload), "%.1f", snapshot.airTemp);
-    publishRaw(getSensorTopic("air_temperature").c_str(), payload, true);
-
-    snprintf(payload, sizeof(payload), "%.1f", snapshot.airHumidity);
-    publishRaw(getSensorTopic("air_humidity").c_str(), payload, true);
-
-    snprintf(payload, sizeof(payload), "%.1f", snapshot.soilMoisture);
-    publishRaw(getSensorTopic("soil_moisture").c_str(), payload, true);
-
-    snprintf(payload, sizeof(payload), "%.1f", snapshot.soilTemp);
-    publishRaw(getSensorTopic("soil_temperature").c_str(), payload, true);
-
-    snprintf(payload, sizeof(payload), "%.1f", snapshot.ph);
-    publishRaw(getSensorTopic("ph").c_str(), payload, true);
-
-    snprintf(payload, sizeof(payload), "%u", snapshot.ec);
-    publishRaw(getSensorTopic("ec").c_str(), payload, true);
-
-    snprintf(payload, sizeof(payload), "%u", snapshot.nitrogen);
-    publishRaw(getSensorTopic("nitrogen").c_str(), payload, true);
-
-    snprintf(payload, sizeof(payload), "%u", snapshot.phosphorus);
-    publishRaw(getSensorTopic("phosphorus").c_str(), payload, true);
-
-    snprintf(payload, sizeof(payload), "%u", snapshot.potassium);
-    publishRaw(getSensorTopic("potassium").c_str(), payload, true);
+    for (uint8_t i = 0; i < SMARTGARDEN_SENSOR_COUNT; ++i) {
+        const SensorEntityConfig& sensor = SMARTGARDEN_SENSORS[i];
+        switch (sensor.field) {
+            case SENSOR_AIR_TEMPERATURE:
+                snprintf(payload, sizeof(payload), "%.1f", snapshot.airTemp);
+                break;
+            case SENSOR_AIR_HUMIDITY:
+                snprintf(payload, sizeof(payload), "%.1f", snapshot.airHumidity);
+                break;
+            case SENSOR_SOIL_MOISTURE:
+                snprintf(payload, sizeof(payload), "%.1f", snapshot.soilMoisture);
+                break;
+            case SENSOR_SOIL_TEMPERATURE:
+                snprintf(payload, sizeof(payload), "%.1f", snapshot.soilTemp);
+                break;
+            case SENSOR_PH:
+                snprintf(payload, sizeof(payload), "%.1f", snapshot.ph);
+                break;
+            case SENSOR_EC:
+                snprintf(payload, sizeof(payload), "%u", snapshot.ec);
+                break;
+            case SENSOR_NITROGEN:
+                snprintf(payload, sizeof(payload), "%u", snapshot.nitrogen);
+                break;
+            case SENSOR_PHOSPHORUS:
+                snprintf(payload, sizeof(payload), "%u", snapshot.phosphorus);
+                break;
+            case SENSOR_POTASSIUM:
+                snprintf(payload, sizeof(payload), "%u", snapshot.potassium);
+                break;
+        }
+        publishRaw(getSensorTopic(sensor.objectId).c_str(), payload, true);
+    }
 
     return true;
 }
@@ -217,14 +252,16 @@ bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
 bool MQTTService::publishRelayStatus(uint8_t relayIndex, bool state)
 {
     if (!client.connected()) return false;
-    if (relayIndex >= RELAY_COUNT) return false;
+    if (relayIndex >= SMARTGARDEN_RELAY_COUNT) return false;
     return publishRaw(getRelayStateTopic(relayIndex).c_str(), state ? "ON" : "OFF", true);
 }
 
 bool MQTTService::publishAllRelayStatus(const RelayManager* relayMgr)
 {
     if (!relayMgr) return false;
-    for (uint8_t i = 0; i < 8; i++) publishRelayStatus(i, relayMgr->getRelayState(i));
+    for (uint8_t i = 0; i < SMARTGARDEN_RELAY_COUNT; i++) {
+        publishRelayStatus(i, relayMgr->getRelayState(i));
+    }
     return true;
 }
 
@@ -238,13 +275,24 @@ bool MQTTService::publishCropList()
 
     char payload[1024];
     strcpy(payload, "[");
+    size_t offset = 1;
     for (uint8_t i = 0; i < count; i++) {
-        if (i > 0) strcat(payload, ",");
-        char crop[128];
-        snprintf(crop, sizeof(crop), "\"%s\"", crops[i].name);
-        strcat(payload, crop);
+        if (i > 0 && offset + 1 < sizeof(payload)) {
+            payload[offset++] = ',';
+        }
+        if (offset + 1 < sizeof(payload)) {
+            payload[offset++] = '"';
+        }
+        appendEscapedJsonString(payload, sizeof(payload), offset, crops[i].name);
+        if (offset + 1 < sizeof(payload)) {
+            payload[offset++] = '"';
+        }
+        payload[offset] = '\0';
     }
-    strcat(payload, "]");
+    if (offset + 1 < sizeof(payload)) {
+        payload[offset++] = ']';
+        payload[offset] = '\0';
+    }
 
     return publish("crop/available", payload, true);
 }
@@ -307,8 +355,8 @@ void MQTTService::subscribeToTopics()
 void MQTTService::handleRelayCommand(const char* relayName, const char* payload)
 {
     uint8_t relayIndex = 0xFF;
-    for (uint8_t i = 0; i < RELAY_COUNT; i++) {
-        if (strcmp(relayName, RELAY_OBJECT_IDS[i]) == 0) {
+    for (uint8_t i = 0; i < SMARTGARDEN_RELAY_COUNT; i++) {
+        if (strcmp(relayName, SMARTGARDEN_RELAYS[i].objectId) == 0) {
             relayIndex = i;
             break;
         }
@@ -333,7 +381,7 @@ void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int len
     String topicStr(topic);
     message[sizeof(message) - 1] = '\0';
 
-    for (uint8_t i = 0; i < RELAY_COUNT; ++i) {
+    for (uint8_t i = 0; i < SMARTGARDEN_RELAY_COUNT; ++i) {
         if (topicStr == getRelayCommandTopic(i)) {
             handleRelayCommand(getRelayObjectId(i), message);
             return;
@@ -347,8 +395,8 @@ void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int len
 
 const char* MQTTService::getRelayObjectId(uint8_t relayIndex) const
 {
-    if (relayIndex >= RELAY_COUNT) {
+    if (relayIndex >= SMARTGARDEN_RELAY_COUNT) {
         return "relay";
     }
-    return RELAY_OBJECT_IDS[relayIndex];
+    return SMARTGARDEN_RELAYS[relayIndex].objectId;
 }

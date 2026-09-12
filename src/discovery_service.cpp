@@ -2,47 +2,13 @@
 
 #include "app_config.h"
 #include "garden_profile.h"
+#include "smartgarden_topics.h"
 
 namespace {
 
-constexpr uint8_t RELAY_COUNT = 8;
-
-const char* const RELAY_OBJECT_IDS[RELAY_COUNT] = {
-    "fan",
-    "heater",
-    "cooler",
-    "humidifier",
-    "dehumidifier",
-    "irrigation",
-    "relay7",
-    "relay8"
-};
-
-const char* const RELAY_NAMES[RELAY_COUNT] = {
-    "Circulation Fan",
-    "Heater",
-    "Cooler",
-    "Humidifier",
-    "Dehumidifier",
-    "Irrigation",
-    "Relay 7",
-    "Relay 8"
-};
-
-const char* const RELAY_ICONS[RELAY_COUNT] = {
-    "mdi:fan",
-    "mdi:radiator",
-    "mdi:snowflake",
-    "mdi:air-humidifier",
-    "mdi:water-off",
-    "mdi:watering-can",
-    "mdi:toggle-switch",
-    "mdi:toggle-switch"
-};
-
 String deviceBlock(const char* deviceId)
 {
-    String block = "\"dev\":{\"ids\":[\"";
+    String block = "\"device\":{\"identifiers\":[\"";
     block += deviceId;
     block += "\"],\"name\":\"";
     block += APP_NAME;
@@ -63,6 +29,38 @@ String discoveryTopic(const char* domain, const char* deviceId, const char* obje
     return "homeassistant/" + String(domain) + "/" + deviceId + "/" + objectId + "/config";
 }
 
+void appendEscapedJsonString(String& out, const char* value)
+{
+    for (const unsigned char* ptr = reinterpret_cast<const unsigned char*>(value); *ptr != '\0'; ++ptr) {
+        switch (*ptr) {
+            case '\"':
+                out += "\\\"";
+                break;
+            case '\\':
+                out += "\\\\";
+                break;
+            case '\b':
+                out += "\\b";
+                break;
+            case '\f':
+                out += "\\f";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                out += static_cast<char>(*ptr);
+                break;
+        }
+    }
+}
+
 String quotedList()
 {
     CropProfileStore::initialize();
@@ -75,7 +73,7 @@ String quotedList()
             options += ",";
         }
         options += "\"";
-        options += crops[i].name;
+        appendEscapedJsonString(options, crops[i].name);
         options += "\"";
     }
     options += "]";
@@ -143,29 +141,9 @@ void DiscoveryService::publishFirmwareEntity()
 
 void DiscoveryService::publishSensorEntities()
 {
-    struct SensorConfig {
-        const char* objectId;
-        const char* name;
-        const char* deviceClass;
-        const char* stateClass;
-        const char* unit;
-        const char* icon;
-    };
-
-    const SensorConfig sensors[] = {
-        {"air_temperature", "Air Temperature", "temperature", "measurement", "\xC2\xB0""C", "mdi:thermometer"},
-        {"air_humidity", "Air Humidity", "humidity", "measurement", "%", "mdi:water-percent"},
-        {"soil_moisture", "Soil Moisture", "moisture", "measurement", "%", "mdi:sprout"},
-        {"soil_temperature", "Soil Temperature", "temperature", "measurement", "\xC2\xB0""C", "mdi:thermometer-lines"},
-        {"ph", "pH Value", nullptr, "measurement", nullptr, "mdi:ph"},
-        {"ec", "EC", nullptr, "measurement", "uS/cm", "mdi:flash"},
-        {"nitrogen", "Nitrogen", nullptr, "measurement", "mg/kg", "mdi:leaf"},
-        {"phosphorus", "Phosphorus", nullptr, "measurement", "mg/kg", "mdi:flask"},
-        {"potassium", "Potassium", nullptr, "measurement", "mg/kg", "mdi:periodic-table"}
-    };
-
     const char* deviceId = mqtt.getDeviceId();
-    for (const auto& sensor : sensors) {
+    for (uint8_t i = 0; i < SMARTGARDEN_SENSOR_COUNT; ++i) {
+        const SensorEntityConfig& sensor = SMARTGARDEN_SENSORS[i];
         String payload =
             "{"
             "\"name\":\"" + String(sensor.name) + "\","
@@ -207,22 +185,23 @@ void DiscoveryService::publishSensorEntities()
 void DiscoveryService::publishRelayEntities()
 {
     const char* deviceId = mqtt.getDeviceId();
-    for (uint8_t i = 0; i < RELAY_COUNT; ++i) {
+    for (uint8_t i = 0; i < SMARTGARDEN_RELAY_COUNT; ++i) {
+        const RelayEntityConfig& relay = SMARTGARDEN_RELAYS[i];
         String payload =
             "{"
-            "\"name\":\"" + String(RELAY_NAMES[i]) + "\","
-            "\"object_id\":\"" + String(deviceId) + "_" + RELAY_OBJECT_IDS[i] + "\","
-            "\"unique_id\":\"" + String(deviceId) + "_" + RELAY_OBJECT_IDS[i] + "\","
+            "\"name\":\"" + String(relay.name) + "\","
+            "\"object_id\":\"" + String(deviceId) + "_" + relay.objectId + "\","
+            "\"unique_id\":\"" + String(deviceId) + "_" + relay.objectId + "\","
             "\"command_topic\":\"" + mqtt.getRelayCommandTopic(i) + "\","
             "\"state_topic\":\"" + mqtt.getRelayStateTopic(i) + "\","
             "\"payload_on\":\"ON\","
             "\"payload_off\":\"OFF\","
-            "\"icon\":\"" + String(RELAY_ICONS[i]) + "\","
+            "\"icon\":\"" + String(relay.icon) + "\","
             + availabilityBlock(mqtt) + ","
             + deviceBlock(deviceId) +
             "}";
 
-        mqtt.publishRaw(discoveryTopic("switch", deviceId, RELAY_OBJECT_IDS[i]).c_str(), payload.c_str(), true);
+        mqtt.publishRaw(discoveryTopic("switch", deviceId, relay.objectId).c_str(), payload.c_str(), true);
     }
 }
 
