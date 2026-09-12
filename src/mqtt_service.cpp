@@ -210,16 +210,9 @@ void MQTTService::subscribeToTopics()
     client->subscribe("smartgarden/crop/select");
 }
 
-void MQTTService::handleRelayCommand(const char* relayName, const char* payload)
+void MQTTService::handleRelayCommand(uint8_t relayIndex, const char* payload)
 {
-    uint8_t relayIndex = 0xFF;
-    for (uint8_t i = 0; i < 8; i++) {
-        if (strcmp(relayName, RELAY_TOPIC_IDS[i]) == 0) {
-            relayIndex = i;
-            break;
-        }
-    }
-    if (relayIndex == 0xFF) return;
+    if (relayIndex >= 8) return;
     bool state = (strcmp(payload, "ON") == 0 || strcmp(payload, "1") == 0);
     if (relayCallback) relayCallback(relayIndex, state);
 }
@@ -247,7 +240,7 @@ void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int len
     for (uint8_t i = 0; i < 8; i++) {
         String relayTopic = String("smartgarden/relay/") + String(i + 1) + "/set";
         if (topicStr == relayTopic) {
-            handleRelayCommand(RELAY_TOPIC_IDS[i], message);
+            handleRelayCommand(i, message);
             return;
         }
     }

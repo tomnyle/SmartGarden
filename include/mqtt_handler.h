@@ -20,9 +20,28 @@ inline void publishCurrentCropConfig()
 // Publish list of available crops to MQTT
 inline void publishCropList()
 {
-    char buffer[128];
-    snprintf(buffer, sizeof(buffer), "Smart Garden Ready - %u crops available", 13);
-    client.publish("smartgarden/crop/available", buffer, true);
+    CropProfileStore::initialize();
+
+    uint8_t count = 0;
+    const CropProfile* crops = CropProfileStore::getAllCrops(count);
+    String payload = "[";
+
+    for (uint8_t i = 0; i < count; i++)
+    {
+        if (i > 0)
+        {
+            payload += ",";
+        }
+
+        payload += "{\"id\":";
+        payload += String(crops[i].id);
+        payload += ",\"name\":\"";
+        payload += crops[i].name;
+        payload += "\"}";
+    }
+
+    payload += "]";
+    client.publish("smartgarden/crop/available", payload.c_str(), true);
 }
 
 #endif

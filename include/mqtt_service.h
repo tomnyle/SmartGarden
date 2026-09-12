@@ -66,7 +66,7 @@ private:
     
     // Helper functions
     void subscribeToTopics();
-    void handleRelayCommand(const char* relayName, const char* payload);
+    void handleRelayCommand(uint8_t relayIndex, const char* payload);
     void handleCropSelect(const char* payload);
 };
 
