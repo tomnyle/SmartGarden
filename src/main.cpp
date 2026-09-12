@@ -102,26 +102,26 @@ void publishDiscoveryMessages() {
     Serial.println("\n[MQTT Discovery] Publishing Home Assistant discovery...");
 
     char buffer[1024];
-    const char* deviceInfo = R"({"ids":["smartgarden_esp32"],"mf":"DIY","mdl":"ESP32","name":"Smart Garden"})";
+    const char* deviceInfo = R"({"ids":["smartgarden_esp32"],"identifiers":["smartgarden_esp32"],"mf":"DIY","manufacturer":"DIY","mdl":"ESP32","model":"ESP32","name":"Smart Garden"})";
 
     // Sensors
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Temperature\",\"obj_id\":\"air_temp\",\"uniq_id\":\"smartgarden_air_temp\",\"stat_t\":\"smartgarden/sensors/air_temp\",\"dev_cla\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Air Temperature\",\"obj_id\":\"air_temp\",\"uniq_id\":\"smartgarden_air_temp\",\"stat_t\":\"smartgarden/sensors/air_temp\",\"dev_cla\":\"temperature\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "air_temp", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Humidity\",\"obj_id\":\"air_humidity\",\"uniq_id\":\"smartgarden_air_humidity\",\"stat_t\":\"smartgarden/sensors/air_humidity\",\"dev_cla\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Air Humidity\",\"obj_id\":\"air_humidity\",\"uniq_id\":\"smartgarden_air_humidity\",\"stat_t\":\"smartgarden/sensors/air_humidity\",\"dev_cla\":\"humidity\",\"device_class\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "air_humidity", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Moisture\",\"obj_id\":\"soil_moisture\",\"uniq_id\":\"smartgarden_soil_moisture\",\"stat_t\":\"smartgarden/sensors/soil_moisture\",\"dev_cla\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Soil Moisture\",\"obj_id\":\"soil_moisture\",\"uniq_id\":\"smartgarden_soil_moisture\",\"stat_t\":\"smartgarden/sensors/soil_moisture\",\"dev_cla\":\"moisture\",\"device_class\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "soil_moisture", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Temperature\",\"obj_id\":\"soil_temp\",\"uniq_id\":\"smartgarden_soil_temp\",\"stat_t\":\"smartgarden/sensors/soil_temp\",\"dev_cla\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Soil Temperature\",\"obj_id\":\"soil_temp\",\"uniq_id\":\"smartgarden_soil_temp\",\"stat_t\":\"smartgarden/sensors/soil_temp\",\"dev_cla\":\"temperature\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "soil_temp", buffer);
 
