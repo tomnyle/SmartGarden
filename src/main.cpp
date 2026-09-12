@@ -97,7 +97,7 @@ static void buildDeviceBlock(char* buffer, size_t size) {
     snprintf(
         buffer,
         size,
-        "{\"identifiers\":[\"%s\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32 SmartGarden Controller\",\"sw_version\":\"%s\"}",
+        "{\"ids\":[\"%s\"],\"name\":\"Smart Garden\",\"mf\":\"DIY\",\"mdl\":\"ESP32 SmartGarden Controller\",\"sw\":\"%s\"}",
         deviceId,
         APP_VERSION
     );
@@ -218,20 +218,20 @@ void publishDiscoveryMessages() {
         String payload =
             String("{\"name\":\"") + sensor.name +
             "\",\"uniq_id\":\"" + deviceId + "_" + sensor.objectId +
-            "\",\"obj_id\":\"" + sensor.objectId +
+            "\",\"object_id\":\"" + sensor.objectId +
             "\",\"stat_t\":\"" + sensor.stateTopic +
             "\",\"avty_t\":\"" + availabilityTopic +
             "\",\"pl_avail\":\"online\"" +
             ",\"pl_not_avail\":\"offline\"";
 
         if (sensor.deviceClass) {
-            payload += String(",\"device_class\":\"") + sensor.deviceClass + "\"";
+            payload += String(",\"dev_cla\":\"") + sensor.deviceClass + "\"";
         }
         if (sensor.stateClass) {
-            payload += String(",\"state_class\":\"") + sensor.stateClass + "\"";
+            payload += String(",\"stat_cla\":\"") + sensor.stateClass + "\"";
         }
         if (sensor.unit) {
-            payload += String(",\"unit_of_measurement\":\"") + sensor.unit + "\"";
+            payload += String(",\"unit_of_meas\":\"") + sensor.unit + "\"";
         }
 
         payload += String(",\"dev\":") + deviceInfo + "}";
@@ -243,7 +243,7 @@ void publishDiscoveryMessages() {
         String payload =
             String("{\"name\":\"") + relayNames[i] +
             "\",\"uniq_id\":\"" + deviceId + "_" + relayObjectIds[i] +
-            "\",\"obj_id\":\"" + relayObjectIds[i] + "\"";
+            "\",\"object_id\":\"" + relayObjectIds[i] + "\"";
 
         payload += String(",\"stat_t\":\"smartgarden/relay/") + String(i + 1) + "/state\"";
         payload += String(",\"cmd_t\":\"smartgarden/relay/") + String(i + 1) + "/set\"";
