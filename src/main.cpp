@@ -221,8 +221,8 @@ void publishDiscoveryMessages() {
             "\",\"obj_id\":\"" + sensor.objectId +
             "\",\"stat_t\":\"" + sensor.stateTopic +
             "\",\"avty_t\":\"" + availabilityTopic +
-            "\",\"payload_available\":\"online\"" +
-            ",\"payload_not_available\":\"offline\"";
+            "\",\"pl_avail\":\"online\"" +
+            ",\"pl_not_avail\":\"offline\"";
 
         if (sensor.deviceClass) {
             payload += String(",\"device_class\":\"") + sensor.deviceClass + "\"";
@@ -247,9 +247,9 @@ void publishDiscoveryMessages() {
 
         payload += String(",\"stat_t\":\"smartgarden/relay/") + String(i + 1) + "/state\"";
         payload += String(",\"cmd_t\":\"smartgarden/relay/") + String(i + 1) + "/set\"";
-        payload += ",\"payload_on\":\"ON\",\"payload_off\":\"OFF\"";
+        payload += ",\"pl_on\":\"ON\",\"pl_off\":\"OFF\"";
         payload += String(",\"avty_t\":\"") + availabilityTopic + "\"";
-        payload += ",\"payload_available\":\"online\",\"payload_not_available\":\"offline\"";
+        payload += ",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\"";
         payload += String(",\"dev\":") + deviceInfo + "}";
         publishDiscoveryMessage(topic, payload);
     }
@@ -358,16 +358,16 @@ void loop() {
         float airHum = dht.readHumidity();
 
         if (isnan(airTemp)) {
-            airTemp = 0.0f;
             Serial.println("[Sensor] DHT22 Temperature read failed!");
+        } else {
+            sensorState.airTemp = airTemp;
         }
         if (isnan(airHum)) {
-            airHum = 0.0f;
             Serial.println("[Sensor] DHT22 Humidity read failed!");
+        } else {
+            sensorState.airHumidity = airHum;
         }
 
-        sensorState.airTemp = airTemp;
-        sensorState.airHumidity = airHum;
         sensorState.soilMoisture = 0.0f;
         sensorState.soilTemp = 0.0f;
         sensorState.ph = 0.0f;
