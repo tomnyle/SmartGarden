@@ -125,7 +125,7 @@ SmartGarden/
 ├── src/
 │   └── main.cpp                 # Main firmware
 ├── include/
-│   ├── config.h                  # Cấu hình tập trung
+│   ├── app_config.h              # Cấu hình WiFi/MQTT mặc định
 │   ├── crop_profiles.h           # Định nghĩa loại cây
 │   ├── auto_control.h            # Logic điều khiển
 │   └── mqtt_handler.h            # MQTT topics

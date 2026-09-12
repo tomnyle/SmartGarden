@@ -97,7 +97,7 @@ static void buildDeviceBlock(char* buffer, size_t size) {
     snprintf(
         buffer,
         size,
-        "{\"ids\":[\"%s\"],\"name\":\"Smart Garden\",\"mf\":\"DIY\",\"mdl\":\"ESP32 SmartGarden Controller\",\"sw\":\"%s\"}",
+        "{\"identifiers\":[\"%s\"],\"name\":\"Smart Garden\",\"manufacturer\":\"DIY\",\"model\":\"ESP32 SmartGarden Controller\",\"sw_version\":\"%s\"}",
         deviceId,
         APP_VERSION
     );
@@ -221,17 +221,17 @@ void publishDiscoveryMessages() {
             "\",\"obj_id\":\"" + sensor.objectId +
             "\",\"stat_t\":\"" + sensor.stateTopic +
             "\",\"avty_t\":\"" + availabilityTopic +
-            "\",\"pl_avail\":\"online\"" +
-            ",\"pl_not_avail\":\"offline\"";
+            "\",\"payload_available\":\"online\"" +
+            ",\"payload_not_available\":\"offline\"";
 
         if (sensor.deviceClass) {
-            payload += String(",\"dev_cla\":\"") + sensor.deviceClass + "\"";
+            payload += String(",\"device_class\":\"") + sensor.deviceClass + "\"";
         }
         if (sensor.stateClass) {
-            payload += String(",\"stat_cla\":\"") + sensor.stateClass + "\"";
+            payload += String(",\"state_class\":\"") + sensor.stateClass + "\"";
         }
         if (sensor.unit) {
-            payload += String(",\"unit_of_meas\":\"") + sensor.unit + "\"";
+            payload += String(",\"unit_of_measurement\":\"") + sensor.unit + "\"";
         }
 
         payload += String(",\"dev\":") + deviceInfo + "}";
@@ -247,9 +247,9 @@ void publishDiscoveryMessages() {
 
         payload += String(",\"stat_t\":\"smartgarden/relay/") + String(i + 1) + "/state\"";
         payload += String(",\"cmd_t\":\"smartgarden/relay/") + String(i + 1) + "/set\"";
-        payload += ",\"pl_on\":\"ON\",\"pl_off\":\"OFF\"";
+        payload += ",\"payload_on\":\"ON\",\"payload_off\":\"OFF\"";
         payload += String(",\"avty_t\":\"") + availabilityTopic + "\"";
-        payload += ",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\"";
+        payload += ",\"payload_available\":\"online\",\"payload_not_available\":\"offline\"";
         payload += String(",\"dev\":") + deviceInfo + "}";
         publishDiscoveryMessage(topic, payload);
     }
