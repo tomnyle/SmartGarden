@@ -48,6 +48,7 @@ private:
     const char* mqttBroker;
     int mqttPort;
     char deviceId[64];
+    char mqttClientId[64];
     char mqttUsername[64];
     char mqttPassword[64];
     bool connected;
@@ -65,7 +66,7 @@ private:
     
     // Helper functions
     void subscribeToTopics();
-    void handleRelayCommand(const char* relayName, const char* payload);
+    void handleRelayCommand(uint8_t relayIndex, const char* payload);
     void handleCropSelect(const char* payload);
 };
 

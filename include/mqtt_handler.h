@@ -14,18 +14,34 @@ void publishCropList();
 // Publish current active crop configuration to MQTT
 inline void publishCurrentCropConfig()
 {
-    // Publish status
-    client.publish("smartgarden/system/status", "online", true);
+    client.publish("smartgarden/status", "online", true);
 }
 
 // Publish list of available crops to MQTT
 inline void publishCropList()
 {
-    // Get available crops (simplified)
-    char buffer[128];
-    snprintf(buffer, sizeof(buffer), "Smart Garden Ready - %u crops available", 13);
-    client.publish("smartgarden/status", buffer, true);
-    client.publish("smartgarden/system/status", "online", true);
+    CropProfileStore::initialize();
+
+    uint8_t count = 0;
+    const CropProfile* crops = CropProfileStore::getAllCrops(count);
+    String payload = "[";
+
+    for (uint8_t i = 0; i < count; i++)
+    {
+        if (i > 0)
+        {
+            payload += ",";
+        }
+
+        payload += "{\"id\":";
+        payload += String(crops[i].id);
+        payload += ",\"name\":\"";
+        payload += crops[i].name;
+        payload += "\"}";
+    }
+
+    payload += "]";
+    client.publish("smartgarden/crop/available", payload.c_str(), true);
 }
 
 #endif

@@ -3,7 +3,7 @@
 #include <DHT.h>
 #include <HardwareSerial.h>
 
-// Declare as extern - defined in main.cpp
+// Declare as extern - defined in smartgarden.cpp
 extern DHT dht;
 
 // RS485 Serial (Serial2 on ESP32)
