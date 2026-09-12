@@ -42,6 +42,8 @@ const char* deviceId = "smartgarden";
 const char* discoveryPrefix = "homeassistant";
 const char* availabilityTopic = "smartgarden/status";
 const char* currentCropTopic = "smartgarden/crop/current";
+const char* cropCommandTopic = "smartgarden/crop/set";
+const char* cropOptions = "[\"Sâm\",\"Cà chua\",\"Dâu tây\",\"Rau mầm\",\"Cải kale\",\"Bánh chua\",\"Thơm\",\"Xà lách\",\"Ớt\",\"Cúc hoa mi\",\"Chanh\",\"Bạc hà\",\"Tỏi\"]";
 
 struct SensorState {
     float airTemp = 0.0f;
@@ -164,6 +166,26 @@ static void publishSwitchDiscovery(uint8_t index, const char* deviceInfo) {
     publishRetained(topic, payload);
 }
 
+static void publishCropDiscovery(const char* deviceInfo) {
+    char topic[128];
+    char payload[768];
+
+    snprintf(topic, sizeof(topic), "%s/select/%s/current_crop/config", discoveryPrefix, deviceId);
+    snprintf(
+        payload,
+        sizeof(payload),
+        "{\"name\":\"Current Crop\",\"uniq_id\":\"%s_current_crop\",\"object_id\":\"current_crop\",\"stat_t\":\"%s\",\"cmd_t\":\"%s\",\"ops\":%s,\"avty_t\":\"%s\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
+        deviceId,
+        currentCropTopic,
+        cropCommandTopic,
+        cropOptions,
+        availabilityTopic,
+        deviceInfo
+    );
+
+    publishRetained(topic, payload);
+}
+
 static void publishRelayState(uint8_t index) {
     char topic[48];
     snprintf(topic, sizeof(topic), "smartgarden/relay/%u/state", index + 1);
@@ -243,7 +265,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         }
     }
 
-    if (String(topic) == "smartgarden/crop/set" && msg.length() > 0) {
+    if (String(topic) == cropCommandTopic && msg.length() > 0) {
         msg.toCharArray(currentCrop, sizeof(currentCrop));
         publishCropState();
         Serial.printf("[Crop] Current crop -> %s\n", currentCrop);
@@ -266,8 +288,7 @@ void publishDiscoveryMessages() {
         {"ec", "EC", "smartgarden/sensors/ec", nullptr, nullptr, "uS/cm"},
         {"nitrogen", "Nitrogen", "smartgarden/sensors/nitrogen", nullptr, nullptr, "mg/kg"},
         {"phosphorus", "Phosphorus", "smartgarden/sensors/phosphorus", nullptr, nullptr, "mg/kg"},
-        {"potassium", "Potassium", "smartgarden/sensors/potassium", nullptr, nullptr, "mg/kg"},
-        {"current_crop", "Current Crop", currentCropTopic, nullptr, nullptr, nullptr}
+        {"potassium", "Potassium", "smartgarden/sensors/potassium", nullptr, nullptr, "mg/kg"}
     };
 
     for (const DiscoverySensorConfig& sensor : sensors) {
@@ -277,6 +298,8 @@ void publishDiscoveryMessages() {
     for (int i = 0; i < RELAY_COUNT; i++) {
         publishSwitchDiscovery(i, deviceInfo);
     }
+
+    publishCropDiscovery(deviceInfo);
 
     Serial.println("[MQTT Discovery] All discovery messages published!\n");
 }
@@ -296,7 +319,7 @@ void reconnect() {
                 String topic = "smartgarden/relay/" + String(i + 1) + "/set";
                 client.subscribe(topic.c_str());
             }
-            client.subscribe("smartgarden/crop/set");
+            client.subscribe(cropCommandTopic);
 
             publishAllState();
         } else {
