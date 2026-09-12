@@ -32,7 +32,13 @@ void appendEscapedJsonString(String& out, const char* value)
                 out += "\\t";
                 break;
             default:
-                out += static_cast<char>(*ptr);
+                if (*ptr < 0x20) {
+                    char encoded[7];
+                    snprintf(encoded, sizeof(encoded), "\\u%04x", *ptr);
+                    out += encoded;
+                } else {
+                    out += static_cast<char>(*ptr);
+                }
                 break;
         }
     }
@@ -118,18 +124,26 @@ void DiscoveryService::begin()
 void DiscoveryService::publishStatusEntity()
 {
     const char* deviceId = mqtt.getDeviceId();
-    String payload =
-        "{"
-        "\"name\":" + jsonString("ESP32 Status") + ","
-        "\"object_id\":" + jsonString((String(deviceId) + "_status").c_str()) + ","
-        "\"unique_id\":" + jsonString((String(deviceId) + "_status").c_str()) + ","
-        "\"state_topic\":" + jsonString(mqtt.getStatusTopic().c_str()) + ","
-        "\"payload_on\":" + jsonString("online") + ","
-        "\"payload_off\":" + jsonString("offline") + ","
-        "\"device_class\":" + jsonString("connectivity") + ","
-        + availabilityBlock(mqtt) + ","
-        + deviceBlock(deviceId) +
-        "}";
+    String payload = "{";
+    payload += "\"name\":";
+    payload += jsonString("ESP32 Status");
+    payload += ",\"object_id\":";
+    payload += jsonString((String(deviceId) + "_status").c_str());
+    payload += ",\"unique_id\":";
+    payload += jsonString((String(deviceId) + "_status").c_str());
+    payload += ",\"state_topic\":";
+    payload += jsonString(mqtt.getStatusTopic().c_str());
+    payload += ",\"payload_on\":";
+    payload += jsonString("online");
+    payload += ",\"payload_off\":";
+    payload += jsonString("offline");
+    payload += ",\"device_class\":";
+    payload += jsonString("connectivity");
+    payload += ",";
+    payload += availabilityBlock(mqtt);
+    payload += ",";
+    payload += deviceBlock(deviceId);
+    payload += "}";
 
     mqtt.publishRaw(discoveryTopic("binary_sensor", deviceId, "status").c_str(), payload.c_str(), true);
 }
@@ -137,17 +151,24 @@ void DiscoveryService::publishStatusEntity()
 void DiscoveryService::publishFirmwareEntity()
 {
     const char* deviceId = mqtt.getDeviceId();
-    String payload =
-        "{"
-        "\"name\":" + jsonString("Firmware") + ","
-        "\"object_id\":" + jsonString((String(deviceId) + "_firmware").c_str()) + ","
-        "\"unique_id\":" + jsonString((String(deviceId) + "_firmware").c_str()) + ","
-        "\"state_topic\":" + jsonString(mqtt.getFirmwareTopic().c_str()) + ","
-        "\"entity_category\":" + jsonString("diagnostic") + ","
-        "\"icon\":" + jsonString("mdi:chip") + ","
-        + availabilityBlock(mqtt) + ","
-        + deviceBlock(deviceId) +
-        "}";
+    String payload = "{";
+    payload += "\"name\":";
+    payload += jsonString("Firmware");
+    payload += ",\"object_id\":";
+    payload += jsonString((String(deviceId) + "_firmware").c_str());
+    payload += ",\"unique_id\":";
+    payload += jsonString((String(deviceId) + "_firmware").c_str());
+    payload += ",\"state_topic\":";
+    payload += jsonString(mqtt.getFirmwareTopic().c_str());
+    payload += ",\"entity_category\":";
+    payload += jsonString("diagnostic");
+    payload += ",\"icon\":";
+    payload += jsonString("mdi:chip");
+    payload += ",";
+    payload += availabilityBlock(mqtt);
+    payload += ",";
+    payload += deviceBlock(deviceId);
+    payload += "}";
 
     mqtt.publishRaw(discoveryTopic("sensor", deviceId, "firmware").c_str(), payload.c_str(), true);
 }
@@ -196,19 +217,28 @@ void DiscoveryService::publishRelayEntities()
     const char* deviceId = mqtt.getDeviceId();
     for (uint8_t i = 0; i < SMARTGARDEN_RELAY_COUNT; ++i) {
         const RelayEntityConfig& relay = SMARTGARDEN_RELAYS[i];
-        String payload =
-            "{"
-            "\"name\":" + jsonString(relay.name) + ","
-            "\"object_id\":" + jsonString((String(deviceId) + "_" + relay.objectId).c_str()) + ","
-            "\"unique_id\":" + jsonString((String(deviceId) + "_" + relay.objectId).c_str()) + ","
-            "\"command_topic\":" + jsonString(mqtt.getRelayCommandTopic(i).c_str()) + ","
-            "\"state_topic\":" + jsonString(mqtt.getRelayStateTopic(i).c_str()) + ","
-            "\"payload_on\":" + jsonString("ON") + ","
-            "\"payload_off\":" + jsonString("OFF") + ","
-            "\"icon\":" + jsonString(relay.icon) + ","
-            + availabilityBlock(mqtt) + ","
-            + deviceBlock(deviceId) +
-            "}";
+        String payload = "{";
+        payload += "\"name\":";
+        payload += jsonString(relay.name);
+        payload += ",\"object_id\":";
+        payload += jsonString((String(deviceId) + "_" + relay.objectId).c_str());
+        payload += ",\"unique_id\":";
+        payload += jsonString((String(deviceId) + "_" + relay.objectId).c_str());
+        payload += ",\"command_topic\":";
+        payload += jsonString(mqtt.getRelayCommandTopic(i).c_str());
+        payload += ",\"state_topic\":";
+        payload += jsonString(mqtt.getRelayStateTopic(i).c_str());
+        payload += ",\"payload_on\":";
+        payload += jsonString("ON");
+        payload += ",\"payload_off\":";
+        payload += jsonString("OFF");
+        payload += ",\"icon\":";
+        payload += jsonString(relay.icon);
+        payload += ",";
+        payload += availabilityBlock(mqtt);
+        payload += ",";
+        payload += deviceBlock(deviceId);
+        payload += "}";
 
         mqtt.publishRaw(discoveryTopic("switch", deviceId, relay.objectId).c_str(), payload.c_str(), true);
     }
@@ -217,18 +247,26 @@ void DiscoveryService::publishRelayEntities()
 void DiscoveryService::publishCropEntity()
 {
     const char* deviceId = mqtt.getDeviceId();
-    String payload =
-        "{"
-        "\"name\":" + jsonString("Crop Profile") + ","
-        "\"object_id\":" + jsonString((String(deviceId) + "_crop").c_str()) + ","
-        "\"unique_id\":" + jsonString((String(deviceId) + "_crop").c_str()) + ","
-        "\"command_topic\":" + jsonString(mqtt.getCropSelectTopic().c_str()) + ","
-        "\"state_topic\":" + jsonString(mqtt.getCropCurrentTopic().c_str()) + ","
-        "\"options\":" + quotedList() + ","
-        "\"icon\":" + jsonString("mdi:sprout") + ","
-        + availabilityBlock(mqtt) + ","
-        + deviceBlock(deviceId) +
-        "}";
+    String payload = "{";
+    payload += "\"name\":";
+    payload += jsonString("Crop Profile");
+    payload += ",\"object_id\":";
+    payload += jsonString((String(deviceId) + "_crop").c_str());
+    payload += ",\"unique_id\":";
+    payload += jsonString((String(deviceId) + "_crop").c_str());
+    payload += ",\"command_topic\":";
+    payload += jsonString(mqtt.getCropSelectTopic().c_str());
+    payload += ",\"state_topic\":";
+    payload += jsonString(mqtt.getCropCurrentTopic().c_str());
+    payload += ",\"options\":";
+    payload += quotedList();
+    payload += ",\"icon\":";
+    payload += jsonString("mdi:sprout");
+    payload += ",";
+    payload += availabilityBlock(mqtt);
+    payload += ",";
+    payload += deviceBlock(deviceId);
+    payload += "}";
 
     mqtt.publishRaw(discoveryTopic("select", deviceId, "crop").c_str(), payload.c_str(), true);
 }
