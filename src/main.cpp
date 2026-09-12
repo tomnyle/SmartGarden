@@ -103,8 +103,65 @@ static void buildDeviceBlock(char* buffer, size_t size) {
     );
 }
 
-static void publishDiscoveryMessage(const String& topic, const String& payload) {
-    publishRetained(topic.c_str(), payload.c_str());
+static void publishSensorDiscovery(const DiscoverySensorConfig& sensor, const char* deviceInfo) {
+    char topic[128];
+    char payload[512];
+    int offset = 0;
+
+    snprintf(topic, sizeof(topic), "%s/sensor/%s/%s/config", discoveryPrefix, deviceId, sensor.objectId);
+
+    offset = snprintf(
+        payload,
+        sizeof(payload),
+        "{\"name\":\"%s\",\"uniq_id\":\"%s_%s\",\"object_id\":\"%s\",\"stat_t\":\"%s\",\"avty_t\":\"%s\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\"",
+        sensor.name,
+        deviceId,
+        sensor.objectId,
+        sensor.objectId,
+        sensor.stateTopic,
+        availabilityTopic
+    );
+
+    if (sensor.deviceClass && offset > 0 && offset < (int)sizeof(payload)) {
+        offset += snprintf(payload + offset, sizeof(payload) - offset, ",\"dev_cla\":\"%s\"", sensor.deviceClass);
+    }
+    if (sensor.stateClass && offset > 0 && offset < (int)sizeof(payload)) {
+        offset += snprintf(payload + offset, sizeof(payload) - offset, ",\"stat_cla\":\"%s\"", sensor.stateClass);
+    }
+    if (sensor.unit && offset > 0 && offset < (int)sizeof(payload)) {
+        offset += snprintf(payload + offset, sizeof(payload) - offset, ",\"unit_of_meas\":\"%s\"", sensor.unit);
+    }
+    if (offset > 0 && offset < (int)sizeof(payload)) {
+        snprintf(payload + offset, sizeof(payload) - offset, ",\"dev\":%s}", deviceInfo);
+    }
+
+    publishRetained(topic, payload);
+}
+
+static void publishSwitchDiscovery(uint8_t index, const char* deviceInfo) {
+    char topic[128];
+    char payload[512];
+    char stateTopic[48];
+    char commandTopic[48];
+
+    snprintf(topic, sizeof(topic), "%s/switch/%s/%s/config", discoveryPrefix, deviceId, relayObjectIds[index]);
+    snprintf(stateTopic, sizeof(stateTopic), "smartgarden/relay/%u/state", index + 1);
+    snprintf(commandTopic, sizeof(commandTopic), "smartgarden/relay/%u/set", index + 1);
+    snprintf(
+        payload,
+        sizeof(payload),
+        "{\"name\":\"%s\",\"uniq_id\":\"%s_%s\",\"object_id\":\"%s\",\"stat_t\":\"%s\",\"cmd_t\":\"%s\",\"pl_on\":\"ON\",\"pl_off\":\"OFF\",\"avty_t\":\"%s\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
+        relayNames[index],
+        deviceId,
+        relayObjectIds[index],
+        relayObjectIds[index],
+        stateTopic,
+        commandTopic,
+        availabilityTopic,
+        deviceInfo
+    );
+
+    publishRetained(topic, payload);
 }
 
 static void publishRelayState(uint8_t index) {
@@ -205,53 +262,20 @@ void publishDiscoveryMessages() {
         {"air_humidity", "Air Humidity", "smartgarden/sensors/air_humidity", "humidity", "measurement", "%"},
         {"soil_moisture", "Soil Moisture", "smartgarden/sensors/soil_moisture", "moisture", "measurement", "%"},
         {"soil_temp", "Soil Temperature", "smartgarden/sensors/soil_temp", "temperature", "measurement", "°C"},
-        {"ph", "pH Value", "smartgarden/sensors/ph", nullptr, "measurement", nullptr},
-        {"ec", "EC", "smartgarden/sensors/ec", nullptr, "measurement", "uS/cm"},
-        {"nitrogen", "Nitrogen", "smartgarden/sensors/nitrogen", nullptr, "measurement", "mg/kg"},
-        {"phosphorus", "Phosphorus", "smartgarden/sensors/phosphorus", nullptr, "measurement", "mg/kg"},
-        {"potassium", "Potassium", "smartgarden/sensors/potassium", nullptr, "measurement", "mg/kg"},
+        {"ph", "pH Value", "smartgarden/sensors/ph", nullptr, nullptr, nullptr},
+        {"ec", "EC", "smartgarden/sensors/ec", nullptr, nullptr, "uS/cm"},
+        {"nitrogen", "Nitrogen", "smartgarden/sensors/nitrogen", nullptr, nullptr, "mg/kg"},
+        {"phosphorus", "Phosphorus", "smartgarden/sensors/phosphorus", nullptr, nullptr, "mg/kg"},
+        {"potassium", "Potassium", "smartgarden/sensors/potassium", nullptr, nullptr, "mg/kg"},
         {"current_crop", "Current Crop", currentCropTopic, nullptr, nullptr, nullptr}
     };
 
     for (const DiscoverySensorConfig& sensor : sensors) {
-        String topic = String(discoveryPrefix) + "/sensor/" + deviceId + "/" + sensor.objectId + "/config";
-        String payload =
-            String("{\"name\":\"") + sensor.name +
-            "\",\"uniq_id\":\"" + deviceId + "_" + sensor.objectId +
-            "\",\"object_id\":\"" + sensor.objectId +
-            "\",\"stat_t\":\"" + sensor.stateTopic +
-            "\",\"avty_t\":\"" + availabilityTopic +
-            "\",\"pl_avail\":\"online\"" +
-            ",\"pl_not_avail\":\"offline\"";
-
-        if (sensor.deviceClass) {
-            payload += String(",\"dev_cla\":\"") + sensor.deviceClass + "\"";
-        }
-        if (sensor.stateClass) {
-            payload += String(",\"stat_cla\":\"") + sensor.stateClass + "\"";
-        }
-        if (sensor.unit) {
-            payload += String(",\"unit_of_meas\":\"") + sensor.unit + "\"";
-        }
-
-        payload += String(",\"dev\":") + deviceInfo + "}";
-        publishDiscoveryMessage(topic, payload);
+        publishSensorDiscovery(sensor, deviceInfo);
     }
 
     for (int i = 0; i < RELAY_COUNT; i++) {
-        String topic = String(discoveryPrefix) + "/switch/" + deviceId + "/" + relayObjectIds[i] + "/config";
-        String payload =
-            String("{\"name\":\"") + relayNames[i] +
-            "\",\"uniq_id\":\"" + deviceId + "_" + relayObjectIds[i] +
-            "\",\"object_id\":\"" + relayObjectIds[i] + "\"";
-
-        payload += String(",\"stat_t\":\"smartgarden/relay/") + String(i + 1) + "/state\"";
-        payload += String(",\"cmd_t\":\"smartgarden/relay/") + String(i + 1) + "/set\"";
-        payload += ",\"pl_on\":\"ON\",\"pl_off\":\"OFF\"";
-        payload += String(",\"avty_t\":\"") + availabilityTopic + "\"";
-        payload += ",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\"";
-        payload += String(",\"dev\":") + deviceInfo + "}";
-        publishDiscoveryMessage(topic, payload);
+        publishSwitchDiscovery(i, deviceInfo);
     }
 
     Serial.println("[MQTT Discovery] All discovery messages published!\n");
