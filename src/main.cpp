@@ -172,7 +172,7 @@ void reconnect() {
     while (!client.connected()) {
         Serial.print("[MQTT] Connecting...");
 
-        if (client.connect(deviceId, mqtt_user, mqtt_password, statusTopic, 0, true, "offline", true)) {
+        if (client.connect(deviceId, mqtt_user, mqtt_password, statusTopic, 0, true, "offline")) {
             Serial.println(" Connected!");
 
             publishAvailability("online");
