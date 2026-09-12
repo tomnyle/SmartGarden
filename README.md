@@ -72,31 +72,44 @@ SmartGarden là một hệ thống IoT hoàn chỉnh cho phép quản lý **13 l
 
 ## 📡 MQTT Topics
 
+SmartGarden publishes runtime state under a stable root:
+
+```text
+smartgarden/...
+```
+
+Home Assistant discovery uses:
+
+```text
+homeassistant/<domain>/smartgarden/<object_id>/config
+```
+
 ```
 # Quản lý Cây
-smartgarden/crop/list              → Danh sách tất cả loại cây
-smartgarden/crop/set               → Chọn loại cây (Payload: "lettuce")
-smartgarden/crop/current           → Loại cây hiện tại
-smartgarden/crop/config            → Cấu hình loại cây hiện tại (JSON)
+smartgarden/crop/select       → Chọn loại cây
+smartgarden/crop/current      → Loại cây hiện tại
 
 # Dữ liệu Cảm Biến
-smartgarden/sensors/air_temp       → Nhiệt độ không khí (°C)
-smartgarden/sensors/air_humidity   → Độ ẩm không khí (%)
-smartgarden/sensors/soil_moisture  → Độ ẩm đất (%)
-smartgarden/sensors/soil_temp      → Nhiệt độ đất (°C)
-smartgarden/sensors/ph             → Giá trị pH
-smartgarden/sensors/ec             → Độ dẫn điện (uS/cm)
-smartgarden/sensors/nitrogen       → Nitrogen (mg/kg)
-smartgarden/sensors/phosphorus     → Phosphorus (mg/kg)
-smartgarden/sensors/potassium      → Potassium (mg/kg)
+smartgarden/air_temperature   → Nhiệt độ không khí (°C)
+smartgarden/air_humidity      → Độ ẩm không khí (%)
+smartgarden/soil_moisture     → Độ ẩm đất (%)
+smartgarden/soil_temperature  → Nhiệt độ đất (°C)
+smartgarden/ph                → Giá trị pH
+smartgarden/ec                → Độ dẫn điện (uS/cm)
+smartgarden/nitrogen          → Nitrogen (mg/kg)
+smartgarden/phosphorus        → Phosphorus (mg/kg)
+smartgarden/potassium         → Potassium (mg/kg)
 
 # Relay & Điều Khiển
-smartgarden/relay/1/state          → Trạng thái relay 1
-smartgarden/relay/1/set            → Điều khiển relay 1
-smartgarden/autocontrol/state      → Trạng thái auto control
+smartgarden/fan/state          → Trạng thái relay quạt
+smartgarden/fan/set            → Điều khiển relay quạt
+smartgarden/heater/state       → Trạng thái relay sưởi
+smartgarden/heater/set         → Điều khiển relay sưởi
+smartgarden/status             → online/offline (retained, LWT)
 
-# Cảnh Báo
-smartgarden/alerts                 → Các cảnh báo thời gian thực
+# Chẩn đoán
+smartgarden/firmware   → Phiên bản firmware
+smartgarden/uptime     → Thời gian chạy (giây)
 ```
 
 ## 🔧 Cấu Hình
@@ -123,7 +136,9 @@ Payload: "lettuce"  (hoặc: tomato, ginseng, salvia, morinda, strawberry, v.v.)
 ```
 SmartGarden/
 ├── src/
-│   └── smartgarden.ino          # Main firmware
+│   ├── main.cpp                   # Firmware entrypoint
+│   ├── mqtt_service.cpp           # MQTT connect/reconnect + retained state
+│   └── discovery_service.cpp      # Home Assistant discovery
 ├── include/
 │   ├── config.h                  # Cấu hình tập trung
 │   ├── crop_profiles.h           # Định nghĩa loại cây
