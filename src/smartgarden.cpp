@@ -97,7 +97,6 @@ void setup()
     randomSeed(static_cast<uint32_t>(micros()));
 
     relayManager.begin();
-    dht.begin();
     sensorManager.begin();
 
     CropProfileStore::initialize();
