@@ -106,52 +106,52 @@ void publishDiscoveryMessages() {
 
     // Sensors
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Temperature\",\"obj_id\":\"air_temp\",\"uniq_id\":\"smartgarden_air_temp\",\"stat_t\":\"smartgarden/sensors/air_temp\",\"dev_cla\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Air Temperature\",\"obj_id\":\"air_temp\",\"uniq_id\":\"smartgarden_air_temp\",\"stat_t\":\"smartgarden/sensors/air_temp\",\"dev_cl\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "air_temp", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Humidity\",\"obj_id\":\"air_humidity\",\"uniq_id\":\"smartgarden_air_humidity\",\"stat_t\":\"smartgarden/sensors/air_humidity\",\"dev_cla\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Air Humidity\",\"obj_id\":\"air_humidity\",\"uniq_id\":\"smartgarden_air_humidity\",\"stat_t\":\"smartgarden/sensors/air_humidity\",\"dev_cl\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "air_humidity", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Moisture\",\"obj_id\":\"soil_moisture\",\"uniq_id\":\"smartgarden_soil_moisture\",\"stat_t\":\"smartgarden/sensors/soil_moisture\",\"dev_cla\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Soil Moisture\",\"obj_id\":\"soil_moisture\",\"uniq_id\":\"smartgarden_soil_moisture\",\"stat_t\":\"smartgarden/sensors/soil_moisture\",\"dev_cl\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "soil_moisture", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Temperature\",\"obj_id\":\"soil_temp\",\"uniq_id\":\"smartgarden_soil_temp\",\"stat_t\":\"smartgarden/sensors/soil_temp\",\"dev_cla\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Soil Temperature\",\"obj_id\":\"soil_temp\",\"uniq_id\":\"smartgarden_soil_temp\",\"stat_t\":\"smartgarden/sensors/soil_temp\",\"dev_cl\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "soil_temp", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"pH Value\",\"obj_id\":\"ph\",\"uniq_id\":\"smartgarden_ph\",\"stat_t\":\"smartgarden/sensors/ph\",\"state_class\":\"measurement\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"pH Value\",\"obj_id\":\"ph\",\"uniq_id\":\"smartgarden_ph\",\"stat_t\":\"smartgarden/sensors/ph\",\"state_class\":\"measurement\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "ph", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"EC\",\"obj_id\":\"ec\",\"uniq_id\":\"smartgarden_ec\",\"stat_t\":\"smartgarden/sensors/ec\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"EC\",\"obj_id\":\"ec\",\"uniq_id\":\"smartgarden_ec\",\"stat_t\":\"smartgarden/sensors/ec\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "ec", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Nitrogen\",\"obj_id\":\"nitrogen\",\"uniq_id\":\"smartgarden_nitrogen\",\"stat_t\":\"smartgarden/sensors/nitrogen\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Nitrogen\",\"obj_id\":\"nitrogen\",\"uniq_id\":\"smartgarden_nitrogen\",\"stat_t\":\"smartgarden/sensors/nitrogen\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "nitrogen", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Phosphorus\",\"obj_id\":\"phosphorus\",\"uniq_id\":\"smartgarden_phosphorus\",\"stat_t\":\"smartgarden/sensors/phosphorus\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Phosphorus\",\"obj_id\":\"phosphorus\",\"uniq_id\":\"smartgarden_phosphorus\",\"stat_t\":\"smartgarden/sensors/phosphorus\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "phosphorus", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Potassium\",\"obj_id\":\"potassium\",\"uniq_id\":\"smartgarden_potassium\",\"stat_t\":\"smartgarden/sensors/potassium\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Potassium\",\"obj_id\":\"potassium\",\"uniq_id\":\"smartgarden_potassium\",\"stat_t\":\"smartgarden/sensors/potassium\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "potassium", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Current Crop\",\"obj_id\":\"crop_current\",\"uniq_id\":\"smartgarden_crop_current\",\"stat_t\":\"smartgarden/crop/current\",\"ent_cat\":\"diagnostic\",\"icon\":\"mdi:sprout\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+        "{\"name\":\"Current Crop\",\"obj_id\":\"crop_current\",\"uniq_id\":\"smartgarden_crop_current\",\"stat_t\":\"smartgarden/crop/current\",\"ent_cat\":\"diagnostic\",\"icon\":\"mdi:sprout\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
     publishDiscoveryConfig("sensor", "crop_current", buffer);
 
@@ -159,7 +159,7 @@ void publishDiscoveryMessages() {
     const char* relayIds[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation", "relay7", "relay8"};
     for (int i = 0; i < RELAY_COUNT; i++) {
         snprintf(buffer, sizeof(buffer),
-            "{\"name\":\"%s\",\"obj_id\":\"%s\",\"uniq_id\":\"smartgarden_%s\",\"stat_t\":\"smartgarden/relay/%d/state\",\"cmd_t\":\"smartgarden/relay/%d/set\",\"pl_on\":\"ON\",\"pl_off\":\"OFF\",\"avty_t\":\"smartgarden/status\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"dev\":%s}",
+            "{\"name\":\"%s\",\"obj_id\":\"%s\",\"uniq_id\":\"smartgarden_%s\",\"stat_t\":\"smartgarden/relay/%d/state\",\"cmd_t\":\"smartgarden/relay/%d/set\",\"pl_on\":\"ON\",\"pl_off\":\"OFF\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
             relayNames[i], relayIds[i], relayIds[i], i + 1, i + 1, deviceInfo);
         publishDiscoveryConfig("switch", relayIds[i], buffer);
     }
