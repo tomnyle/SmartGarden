@@ -53,7 +53,6 @@ void publishRuntimeState()
     climate.control(snapshot);
     mqtt.publishSensorData(snapshot);
     mqtt.publishAllRelayStatus(&relays);
-    mqtt.publishCropList();
     if (currentCrop != nullptr) {
         mqtt.publishCurrentCrop(currentCrop);
     }

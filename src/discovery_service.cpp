@@ -6,29 +6,6 @@
 
 namespace {
 
-String deviceBlock(const char* deviceId)
-{
-    String block = "\"device\":{\"identifiers\":[\"";
-    block += deviceId;
-    block += "\"],\"name\":\"";
-    block += APP_NAME;
-    block += "\",\"manufacturer\":\"tomnyle\",\"model\":\"ESP32 Smart Garden Controller\",\"sw_version\":\"";
-    block += APP_VERSION;
-    block += "\"}";
-    return block;
-}
-
-String availabilityBlock(MQTTService& mqtt)
-{
-    return "\"availability_topic\":\"" + mqtt.getStatusTopic() +
-           "\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\"";
-}
-
-String discoveryTopic(const char* domain, const char* deviceId, const char* objectId)
-{
-    return "homeassistant/" + String(domain) + "/" + deviceId + "/" + objectId + "/config";
-}
-
 void appendEscapedJsonString(String& out, const char* value)
 {
     for (const unsigned char* ptr = reinterpret_cast<const unsigned char*>(value); *ptr != '\0'; ++ptr) {
@@ -59,6 +36,42 @@ void appendEscapedJsonString(String& out, const char* value)
                 break;
         }
     }
+}
+
+String jsonString(const char* value)
+{
+    String out = "\"";
+    appendEscapedJsonString(out, value);
+    out += "\"";
+    return out;
+}
+
+String deviceBlock(const char* deviceId)
+{
+    String block = "\"device\":{\"identifiers\":[";
+    block += jsonString(deviceId);
+    block += "],\"name\":";
+    block += jsonString(APP_NAME);
+    block += ",\"manufacturer\":";
+    block += jsonString("tomnyle");
+    block += ",\"model\":";
+    block += jsonString("ESP32 Smart Garden Controller");
+    block += ",\"sw_version\":";
+    block += jsonString(APP_VERSION);
+    block += "}";
+    return block;
+}
+
+String availabilityBlock(MQTTService& mqtt)
+{
+    return "\"availability_topic\":" + jsonString(mqtt.getStatusTopic().c_str()) +
+           ",\"payload_available\":" + jsonString("online") +
+           ",\"payload_not_available\":" + jsonString("offline");
+}
+
+String discoveryTopic(const char* domain, const char* deviceId, const char* objectId)
+{
+    return "homeassistant/" + String(domain) + "/" + deviceId + "/" + objectId + "/config";
 }
 
 String quotedList()
@@ -107,13 +120,13 @@ void DiscoveryService::publishStatusEntity()
     const char* deviceId = mqtt.getDeviceId();
     String payload =
         "{"
-        "\"name\":\"ESP32 Status\","
-        "\"object_id\":\"" + String(deviceId) + "_status\","
-        "\"unique_id\":\"" + String(deviceId) + "_status\","
-        "\"state_topic\":\"" + mqtt.getStatusTopic() + "\","
-        "\"payload_on\":\"online\","
-        "\"payload_off\":\"offline\","
-        "\"device_class\":\"connectivity\","
+        "\"name\":" + jsonString("ESP32 Status") + ","
+        "\"object_id\":" + jsonString((String(deviceId) + "_status").c_str()) + ","
+        "\"unique_id\":" + jsonString((String(deviceId) + "_status").c_str()) + ","
+        "\"state_topic\":" + jsonString(mqtt.getStatusTopic().c_str()) + ","
+        "\"payload_on\":" + jsonString("online") + ","
+        "\"payload_off\":" + jsonString("offline") + ","
+        "\"device_class\":" + jsonString("connectivity") + ","
         + availabilityBlock(mqtt) + ","
         + deviceBlock(deviceId) +
         "}";
@@ -126,12 +139,12 @@ void DiscoveryService::publishFirmwareEntity()
     const char* deviceId = mqtt.getDeviceId();
     String payload =
         "{"
-        "\"name\":\"Firmware\","
-        "\"object_id\":\"" + String(deviceId) + "_firmware\","
-        "\"unique_id\":\"" + String(deviceId) + "_firmware\","
-        "\"state_topic\":\"" + mqtt.getFirmwareTopic() + "\","
-        "\"entity_category\":\"diagnostic\","
-        "\"icon\":\"mdi:chip\","
+        "\"name\":" + jsonString("Firmware") + ","
+        "\"object_id\":" + jsonString((String(deviceId) + "_firmware").c_str()) + ","
+        "\"unique_id\":" + jsonString((String(deviceId) + "_firmware").c_str()) + ","
+        "\"state_topic\":" + jsonString(mqtt.getFirmwareTopic().c_str()) + ","
+        "\"entity_category\":" + jsonString("diagnostic") + ","
+        "\"icon\":" + jsonString("mdi:chip") + ","
         + availabilityBlock(mqtt) + ","
         + deviceBlock(deviceId) +
         "}";
@@ -146,30 +159,26 @@ void DiscoveryService::publishSensorEntities()
         const SensorEntityConfig& sensor = SMARTGARDEN_SENSORS[i];
         String payload =
             "{"
-            "\"name\":\"" + String(sensor.name) + "\","
-            "\"object_id\":\"" + String(deviceId) + "_" + sensor.objectId + "\","
-            "\"unique_id\":\"" + String(deviceId) + "_" + sensor.objectId + "\","
-            "\"state_topic\":\"" + mqtt.getSensorTopic(sensor.objectId) + "\"";
+            "\"name\":" + jsonString(sensor.name) + ","
+            "\"object_id\":" + jsonString((String(deviceId) + "_" + sensor.objectId).c_str()) + ","
+            "\"unique_id\":" + jsonString((String(deviceId) + "_" + sensor.objectId).c_str()) + ","
+            "\"state_topic\":" + jsonString(mqtt.getSensorTopic(sensor.objectId).c_str());
 
         if (sensor.deviceClass != nullptr) {
-            payload += ",\"device_class\":\"";
-            payload += sensor.deviceClass;
-            payload += "\"";
+            payload += ",\"device_class\":";
+            payload += jsonString(sensor.deviceClass);
         }
         if (sensor.stateClass != nullptr) {
-            payload += ",\"state_class\":\"";
-            payload += sensor.stateClass;
-            payload += "\"";
+            payload += ",\"state_class\":";
+            payload += jsonString(sensor.stateClass);
         }
         if (sensor.unit != nullptr) {
-            payload += ",\"unit_of_measurement\":\"";
-            payload += sensor.unit;
-            payload += "\"";
+            payload += ",\"unit_of_measurement\":";
+            payload += jsonString(sensor.unit);
         }
         if (sensor.icon != nullptr) {
-            payload += ",\"icon\":\"";
-            payload += sensor.icon;
-            payload += "\"";
+            payload += ",\"icon\":";
+            payload += jsonString(sensor.icon);
         }
 
         payload += ",";
@@ -189,14 +198,14 @@ void DiscoveryService::publishRelayEntities()
         const RelayEntityConfig& relay = SMARTGARDEN_RELAYS[i];
         String payload =
             "{"
-            "\"name\":\"" + String(relay.name) + "\","
-            "\"object_id\":\"" + String(deviceId) + "_" + relay.objectId + "\","
-            "\"unique_id\":\"" + String(deviceId) + "_" + relay.objectId + "\","
-            "\"command_topic\":\"" + mqtt.getRelayCommandTopic(i) + "\","
-            "\"state_topic\":\"" + mqtt.getRelayStateTopic(i) + "\","
-            "\"payload_on\":\"ON\","
-            "\"payload_off\":\"OFF\","
-            "\"icon\":\"" + String(relay.icon) + "\","
+            "\"name\":" + jsonString(relay.name) + ","
+            "\"object_id\":" + jsonString((String(deviceId) + "_" + relay.objectId).c_str()) + ","
+            "\"unique_id\":" + jsonString((String(deviceId) + "_" + relay.objectId).c_str()) + ","
+            "\"command_topic\":" + jsonString(mqtt.getRelayCommandTopic(i).c_str()) + ","
+            "\"state_topic\":" + jsonString(mqtt.getRelayStateTopic(i).c_str()) + ","
+            "\"payload_on\":" + jsonString("ON") + ","
+            "\"payload_off\":" + jsonString("OFF") + ","
+            "\"icon\":" + jsonString(relay.icon) + ","
             + availabilityBlock(mqtt) + ","
             + deviceBlock(deviceId) +
             "}";
@@ -210,13 +219,13 @@ void DiscoveryService::publishCropEntity()
     const char* deviceId = mqtt.getDeviceId();
     String payload =
         "{"
-        "\"name\":\"Crop Profile\","
-        "\"object_id\":\"" + String(deviceId) + "_crop\","
-        "\"unique_id\":\"" + String(deviceId) + "_crop\","
-        "\"command_topic\":\"" + mqtt.getCropSelectTopic() + "\","
-        "\"state_topic\":\"" + mqtt.getCropCurrentTopic() + "\","
+        "\"name\":" + jsonString("Crop Profile") + ","
+        "\"object_id\":" + jsonString((String(deviceId) + "_crop").c_str()) + ","
+        "\"unique_id\":" + jsonString((String(deviceId) + "_crop").c_str()) + ","
+        "\"command_topic\":" + jsonString(mqtt.getCropSelectTopic().c_str()) + ","
+        "\"state_topic\":" + jsonString(mqtt.getCropCurrentTopic().c_str()) + ","
         "\"options\":" + quotedList() + ","
-        "\"icon\":\"mdi:sprout\","
+        "\"icon\":" + jsonString("mdi:sprout") + ","
         + availabilityBlock(mqtt) + ","
         + deviceBlock(deviceId) +
         "}";

@@ -326,7 +326,6 @@ bool MQTTService::publishRetainedState()
     publishStatus("online");
     publishRaw(getFirmwareTopic().c_str(), APP_VERSION, true);
     publishUptime(millis());
-    publishCropList();
 
     if (sensorManager != nullptr) {
         publishSensorData(sensorManager->getSnapshot());

@@ -86,7 +86,6 @@ homeassistant/<domain>/smartgarden/<object_id>/config
 
 ```
 # Quản lý Cây
-smartgarden/crop/available    → Danh sách tất cả loại cây
 smartgarden/crop/select       → Chọn loại cây
 smartgarden/crop/current      → Loại cây hiện tại
 
