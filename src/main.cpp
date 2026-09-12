@@ -368,14 +368,6 @@ void loop() {
             sensorState.airHumidity = airHum;
         }
 
-        sensorState.soilMoisture = 0.0f;
-        sensorState.soilTemp = 0.0f;
-        sensorState.ph = 0.0f;
-        sensorState.ec = 0;
-        sensorState.nitrogen = 0;
-        sensorState.phosphorus = 0;
-        sensorState.potassium = 0;
-
         if (client.connected()) {
             publishSensorState();
         }
