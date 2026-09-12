@@ -38,6 +38,8 @@ const char* mqtt_password = "Danh@@@1992";
 
 const char* deviceId = "smartgarden";
 const char* discoveryPrefix = "homeassistant";
+const char* statusTopic = "smartgarden/status";
+const char* defaultCrop = "Sâm";
 
 // ================= RS485 CONTROL =================
 void preTransmission() {
@@ -52,6 +54,16 @@ void postTransmission() {
 static void publishDiscoveryMessage(const char* topic, const char* payload) {
     client.publish(topic, payload, true);
     delay(50);
+}
+
+static void publishDiscoveryConfig(const char* domain, const char* objectId, const char* payload) {
+    char topic[192];
+    snprintf(topic, sizeof(topic), "%s/%s/%s/%s/config", discoveryPrefix, domain, deviceId, objectId);
+    publishDiscoveryMessage(topic, payload);
+}
+
+static void publishAvailability(const char* payload) {
+    client.publish(statusTopic, payload, true);
 }
 
 // ================= RELAY CONTROL =================
@@ -90,64 +102,66 @@ void publishDiscoveryMessages() {
     Serial.println("\n[MQTT Discovery] Publishing Home Assistant discovery...");
 
     char buffer[1024];
-    const char* deviceInfo = R"({"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32","name":"Smart Garden"})";
+    const char* deviceInfo = R"({"ids":["smartgarden_esp32"],"mf":"DIY","mdl":"ESP32","name":"Smart Garden"})";
 
     // Sensors
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Temperature\",\"unique_id\":\"smartgarden_air_temp\",\"state_topic\":\"smartgarden/sensors/air_temp\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"device\":%s}",
+        "{\"name\":\"Air Temperature\",\"obj_id\":\"air_temp\",\"uniq_id\":\"smartgarden_air_temp\",\"stat_t\":\"smartgarden/sensors/air_temp\",\"dev_cl\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
-    publishDiscoveryMessage("homeassistant/sensor/smartgarden_air_temp/config", buffer);
+    publishDiscoveryConfig("sensor", "air_temp", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Air Humidity\",\"unique_id\":\"smartgarden_air_humidity\",\"state_topic\":\"smartgarden/sensors/air_humidity\",\"device_class\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"device\":%s}",
+        "{\"name\":\"Air Humidity\",\"obj_id\":\"air_humidity\",\"uniq_id\":\"smartgarden_air_humidity\",\"stat_t\":\"smartgarden/sensors/air_humidity\",\"dev_cl\":\"humidity\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
-    publishDiscoveryMessage("homeassistant/sensor/smartgarden_air_humidity/config", buffer);
+    publishDiscoveryConfig("sensor", "air_humidity", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Moisture\",\"unique_id\":\"smartgarden_soil_moisture\",\"state_topic\":\"smartgarden/sensors/soil_moisture\",\"device_class\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"device\":%s}",
+        "{\"name\":\"Soil Moisture\",\"obj_id\":\"soil_moisture\",\"uniq_id\":\"smartgarden_soil_moisture\",\"stat_t\":\"smartgarden/sensors/soil_moisture\",\"dev_cl\":\"moisture\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%%\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
-    publishDiscoveryMessage("homeassistant/sensor/smartgarden_soil_moisture/config", buffer);
+    publishDiscoveryConfig("sensor", "soil_moisture", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Soil Temperature\",\"unique_id\":\"smartgarden_soil_temp\",\"state_topic\":\"smartgarden/sensors/soil_temp\",\"device_class\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"device\":%s}",
+        "{\"name\":\"Soil Temperature\",\"obj_id\":\"soil_temp\",\"uniq_id\":\"smartgarden_soil_temp\",\"stat_t\":\"smartgarden/sensors/soil_temp\",\"dev_cl\":\"temperature\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
-    publishDiscoveryMessage("homeassistant/sensor/smartgarden_soil_temp/config", buffer);
+    publishDiscoveryConfig("sensor", "soil_temp", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"pH Value\",\"unique_id\":\"smartgarden_ph\",\"state_topic\":\"smartgarden/sensors/ph\",\"state_class\":\"measurement\",\"device\":%s}",
+        "{\"name\":\"pH Value\",\"obj_id\":\"ph\",\"uniq_id\":\"smartgarden_ph\",\"stat_t\":\"smartgarden/sensors/ph\",\"state_class\":\"measurement\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
-    publishDiscoveryMessage("homeassistant/sensor/smartgarden_ph/config", buffer);
+    publishDiscoveryConfig("sensor", "ph", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"EC\",\"unique_id\":\"smartgarden_ec\",\"state_topic\":\"smartgarden/sensors/ec\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"device\":%s}",
+        "{\"name\":\"EC\",\"obj_id\":\"ec\",\"uniq_id\":\"smartgarden_ec\",\"stat_t\":\"smartgarden/sensors/ec\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"uS/cm\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
-    publishDiscoveryMessage("homeassistant/sensor/smartgarden_ec/config", buffer);
+    publishDiscoveryConfig("sensor", "ec", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Nitrogen\",\"unique_id\":\"smartgarden_nitrogen\",\"state_topic\":\"smartgarden/sensors/nitrogen\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
+        "{\"name\":\"Nitrogen\",\"obj_id\":\"nitrogen\",\"uniq_id\":\"smartgarden_nitrogen\",\"stat_t\":\"smartgarden/sensors/nitrogen\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
-    publishDiscoveryMessage("homeassistant/sensor/smartgarden_nitrogen/config", buffer);
+    publishDiscoveryConfig("sensor", "nitrogen", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Phosphorus\",\"unique_id\":\"smartgarden_phosphorus\",\"state_topic\":\"smartgarden/sensors/phosphorus\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
+        "{\"name\":\"Phosphorus\",\"obj_id\":\"phosphorus\",\"uniq_id\":\"smartgarden_phosphorus\",\"stat_t\":\"smartgarden/sensors/phosphorus\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
-    publishDiscoveryMessage("homeassistant/sensor/smartgarden_phosphorus/config", buffer);
+    publishDiscoveryConfig("sensor", "phosphorus", buffer);
 
     snprintf(buffer, sizeof(buffer),
-        "{\"name\":\"Potassium\",\"unique_id\":\"smartgarden_potassium\",\"state_topic\":\"smartgarden/sensors/potassium\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"device\":%s}",
+        "{\"name\":\"Potassium\",\"obj_id\":\"potassium\",\"uniq_id\":\"smartgarden_potassium\",\"stat_t\":\"smartgarden/sensors/potassium\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mg/kg\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
         deviceInfo);
-    publishDiscoveryMessage("homeassistant/sensor/smartgarden_potassium/config", buffer);
+    publishDiscoveryConfig("sensor", "potassium", buffer);
+
+    snprintf(buffer, sizeof(buffer),
+        "{\"name\":\"Current Crop\",\"obj_id\":\"crop_current\",\"uniq_id\":\"smartgarden_crop_current\",\"stat_t\":\"smartgarden/crop/current\",\"ent_cat\":\"diagnostic\",\"icon\":\"mdi:sprout\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
+        deviceInfo);
+    publishDiscoveryConfig("sensor", "crop_current", buffer);
 
     // Switches
     const char* relayIds[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation", "relay7", "relay8"};
     for (int i = 0; i < RELAY_COUNT; i++) {
         snprintf(buffer, sizeof(buffer),
-            "{\"name\":\"%s\",\"unique_id\":\"smartgarden_%s\",\"state_topic\":\"smartgarden/relay/%d/state\",\"command_topic\":\"smartgarden/relay/%d/set\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"device\":%s}",
-            relayNames[i], relayIds[i], i + 1, i + 1, deviceInfo);
-
-        char switchTopic[128];
-        snprintf(switchTopic, sizeof(switchTopic), "homeassistant/switch/smartgarden_%s/config", relayIds[i]);
-        publishDiscoveryMessage(switchTopic, buffer);
+            "{\"name\":\"%s\",\"obj_id\":\"%s\",\"uniq_id\":\"smartgarden_%s\",\"stat_t\":\"smartgarden/relay/%d/state\",\"cmd_t\":\"smartgarden/relay/%d/set\",\"pl_on\":\"ON\",\"pl_off\":\"OFF\",\"avty_t\":\"smartgarden/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\",\"dev\":%s}",
+            relayNames[i], relayIds[i], relayIds[i], i + 1, i + 1, deviceInfo);
+        publishDiscoveryConfig("switch", relayIds[i], buffer);
     }
 
     Serial.println("[MQTT Discovery] All discovery messages published!\n");
@@ -158,10 +172,13 @@ void reconnect() {
     while (!client.connected()) {
         Serial.print("[MQTT] Connecting...");
 
-        if (client.connect(deviceId, mqtt_user, mqtt_password)) {
+        if (client.connect(deviceId, mqtt_user, mqtt_password, statusTopic, 0, true, "offline")) {
             Serial.println(" Connected!");
 
+            publishAvailability("online");
+
             publishDiscoveryMessages();
+            client.publish("smartgarden/crop/current", defaultCrop, true);
 
             for (int i = 0; i < RELAY_COUNT; i++) {
                 String topic = "smartgarden/relay/" + String(i + 1) + "/set";
