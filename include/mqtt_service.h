@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <Arduino.h>
+#include <WiFiClient.h>
 #include <PubSubClient.h>
 #include "sensor_manager.h"
 #include "garden_profile.h"
@@ -16,19 +17,23 @@ public:
     MQTTService(const char* broker, int port);
     
     void begin(const char* username, const char* password);
-    void setClient(PubSubClient* client);
     
     // Connection management
     bool connect();
     bool isConnected() const;
     void loop();  // Must be called frequently
+    bool consumeConnectEvent();
     
     // Callback setters
     void setRelayCommandCallback(RelayCommandCallback callback);
     void setCropSelectCallback(CropSelectCallback callback);
+    void attachStateProviders(const SensorManager* sensorMgr,
+                              const RelayManager* relayMgr,
+                              const CropProfile* const* currentCrop);
     
     // Publishing functions
-    bool publish(const char* topic, const char* payload);
+    bool publish(const char* topic, const char* payload, bool retained = true);
+    bool publishRaw(const char* topic, const char* payload, bool retained = true);
     bool publishSensorData(const SensorSnapshot& snapshot);
     bool publishRelayStatus(uint8_t relayIndex, bool state);
     bool publishAllRelayStatus(const RelayManager* relayMgr);
@@ -36,28 +41,36 @@ public:
     bool publishCurrentCrop(const CropProfile* profile);
     bool publishStatus(const char* status);
     bool publishUptime(unsigned long uptime);
+    bool publishRetainedState();
     
-    // Home Assistant MQTT Discovery
-    void publishDiscoveryMessages();
-    
-    // Get device ID
     const char* getDeviceId() const { return deviceId; }
+    String getBaseTopic() const;
+    String getStatusTopic() const;
+    String getSensorTopic(const char* sensorName) const;
+    String getRelayStateTopic(uint8_t relayIndex) const;
+    String getRelayCommandTopic(uint8_t relayIndex) const;
+    String getCropCurrentTopic() const;
+    String getCropSelectTopic() const;
+    String getFirmwareTopic() const;
     
 private:
-    PubSubClient* client;
+    WiFiClient wifiClient;
+    PubSubClient client;
     const char* mqttBroker;
     int mqttPort;
     char deviceId[64];
     char mqttUsername[64];
     char mqttPassword[64];
     bool connected;
-    unsigned long lastPublishTime;
-    unsigned long publishInterval;
-    unsigned long lastDiscoveryTime;
+    bool connectEventPending;
+    unsigned long lastReconnectAttempt;
     
     // Callbacks
     RelayCommandCallback relayCallback;
     CropSelectCallback cropCallback;
+    const SensorManager* sensorManager;
+    const RelayManager* relayManager;
+    const CropProfile* const* currentCrop;
     
     // Callback for received messages
     void onMessageReceived(char* topic, byte* payload, unsigned int length);
@@ -67,6 +80,7 @@ private:
     void subscribeToTopics();
     void handleRelayCommand(const char* relayName, const char* payload);
     void handleCropSelect(const char* payload);
+    const char* getRelayObjectId(uint8_t relayIndex) const;
 };
 
 #endif // MQTT_SERVICE_H
