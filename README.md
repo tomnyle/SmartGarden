@@ -102,14 +102,14 @@ smartgarden/alerts                 → Các cảnh báo thời gian thực
 ## 🔧 Cấu Hình
 
 ### WiFi & MQTT
-Chỉnh sửa trong `include/config.h`:
+Chỉnh sửa trong `include/app_config.h`:
 ```cpp
-#define SMARTGARDEN_WIFI_SSID "YOUR_WIFI_SSID"
-#define SMARTGARDEN_WIFI_PASSWORD "YOUR_PASSWORD"
-#define SMARTGARDEN_MQTT_HOST "192.168.1.100"
-#define SMARTGARDEN_MQTT_PORT 1883
-#define SMARTGARDEN_MQTT_USERNAME "username"
-#define SMARTGARDEN_MQTT_PASSWORD "password"
+#define WIFI_SSID "YOUR_WIFI_SSID"
+#define WIFI_PASSWORD "YOUR_PASSWORD"
+#define MQTT_BROKER "192.168.1.100"
+#define MQTT_PORT 1883
+#define MQTT_USERNAME "username"
+#define MQTT_PASSWORD "password"
 ```
 
 ### Chọn Loại Cây
@@ -123,7 +123,7 @@ Payload: "lettuce"  (hoặc: tomato, ginseng, salvia, morinda, strawberry, v.v.)
 ```
 SmartGarden/
 ├── src/
-│   └── smartgarden.ino          # Main firmware
+│   └── main.cpp                 # Main firmware
 ├── include/
 │   ├── config.h                  # Cấu hình tập trung
 │   ├── crop_profiles.h           # Định nghĩa loại cây
