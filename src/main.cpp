@@ -58,8 +58,9 @@ struct SensorState {
 };
 
 SensorState sensorState;
-char currentCrop[32] = "Demo Crop";
+char currentCrop[64] = "Sâm";
 unsigned long lastSensorRead = 0;
+unsigned long lastMqttReconnectAttempt = 0;
 const unsigned long SENSOR_READ_INTERVAL = 10000;
 
 struct DiscoverySensorConfig {
@@ -266,6 +267,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
     if (String(topic) == cropCommandTopic && msg.length() > 0) {
+        if (msg.length() >= sizeof(currentCrop)) {
+            Serial.println("[Crop] Crop name too long, ignoring");
+            return;
+        }
+
         msg.toCharArray(currentCrop, sizeof(currentCrop));
         publishCropState();
         Serial.printf("[Crop] Current crop -> %s\n", currentCrop);
@@ -306,26 +312,34 @@ void publishDiscoveryMessages() {
 
 // ================= MQTT RECONNECT =================
 void reconnect() {
-    while (!client.connected()) {
-        Serial.print("[MQTT] Connecting...");
+    if (client.connected() || WiFi.status() != WL_CONNECTED) {
+        return;
+    }
 
-        if (client.connect(deviceId, mqtt_user, mqtt_password, availabilityTopic, 1, true, "offline")) {
-            Serial.println(" Connected!");
+    const unsigned long now = millis();
+    if (lastMqttReconnectAttempt != 0 && now - lastMqttReconnectAttempt < MQTT_RECONNECT_INTERVAL) {
+        return;
+    }
 
-            publishRetained(availabilityTopic, "online");
-            publishDiscoveryMessages();
+    lastMqttReconnectAttempt = now;
+    Serial.print("[MQTT] Connecting...");
 
-            for (int i = 0; i < RELAY_COUNT; i++) {
-                String topic = "smartgarden/relay/" + String(i + 1) + "/set";
-                client.subscribe(topic.c_str());
-            }
-            client.subscribe(cropCommandTopic);
+    if (client.connect(deviceId, mqtt_user, mqtt_password, availabilityTopic, 1, true, "offline")) {
+        Serial.println(" Connected!");
+        lastMqttReconnectAttempt = 0;
 
-            publishAllState();
-        } else {
-            Serial.printf(" Failed (code=%d), retry in 3s\n", client.state());
-            delay(3000);
+        publishRetained(availabilityTopic, "online");
+        publishDiscoveryMessages();
+
+        for (int i = 0; i < RELAY_COUNT; i++) {
+            String topic = "smartgarden/relay/" + String(i + 1) + "/set";
+            client.subscribe(topic.c_str());
         }
+        client.subscribe(cropCommandTopic);
+
+        publishAllState();
+    } else {
+        Serial.printf(" Failed (code=%d)\n", client.state());
     }
 }
 
