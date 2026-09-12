@@ -37,7 +37,6 @@ public:
     bool publishSensorData(const SensorSnapshot& snapshot);
     bool publishRelayStatus(uint8_t relayIndex, bool state);
     bool publishAllRelayStatus(const RelayManager* relayMgr);
-    bool publishCropList();
     bool publishCurrentCrop(const CropProfile* profile);
     bool publishStatus(const char* status);
     bool publishUptime(unsigned long uptime);

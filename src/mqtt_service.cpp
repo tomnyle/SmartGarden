@@ -10,46 +10,6 @@ namespace {
 
 constexpr unsigned long MQTT_RETRY_INTERVAL_MS = MQTT_RECONNECT_INTERVAL;
 
-void appendEscapedJsonString(char* buffer, size_t bufferSize, size_t& offset, const char* value)
-{
-    for (const unsigned char* ptr = reinterpret_cast<const unsigned char*>(value);
-         *ptr != '\0' && offset + 1 < bufferSize;
-         ++ptr) {
-        const char* replacement = nullptr;
-        switch (*ptr) {
-            case '\"':
-                replacement = "\\\"";
-                break;
-            case '\\':
-                replacement = "\\\\";
-                break;
-            case '\b':
-                replacement = "\\b";
-                break;
-            case '\f':
-                replacement = "\\f";
-                break;
-            case '\n':
-                replacement = "\\n";
-                break;
-            case '\r':
-                replacement = "\\r";
-                break;
-            case '\t':
-                replacement = "\\t";
-                break;
-            default:
-                buffer[offset++] = static_cast<char>(*ptr);
-                continue;
-        }
-
-        for (size_t i = 0; replacement[i] != '\0' && offset + 1 < bufferSize; ++i) {
-            buffer[offset++] = replacement[i];
-        }
-    }
-    buffer[offset] = '\0';
-}
-
 } // namespace
 
 void mqttMessageCallback(char* topic, byte* payload, unsigned int length) {
@@ -265,38 +225,6 @@ bool MQTTService::publishAllRelayStatus(const RelayManager* relayMgr)
         publishRelayStatus(i, relayMgr->getRelayState(i));
     }
     return true;
-}
-
-bool MQTTService::publishCropList()
-{
-    if (!client.connected()) return false;
-
-    CropProfileStore::initialize();
-    uint8_t count = 0;
-    const CropProfile* crops = CropProfileStore::getAllCrops(count);
-
-    char payload[1024];
-    strcpy(payload, "[");
-    size_t offset = 1;
-    for (uint8_t i = 0; i < count; i++) {
-        if (i > 0 && offset + 1 < sizeof(payload)) {
-            payload[offset++] = ',';
-        }
-        if (offset + 1 < sizeof(payload)) {
-            payload[offset++] = '"';
-        }
-        appendEscapedJsonString(payload, sizeof(payload), offset, crops[i].name);
-        if (offset + 1 < sizeof(payload)) {
-            payload[offset++] = '"';
-        }
-        payload[offset] = '\0';
-    }
-    if (offset + 1 < sizeof(payload)) {
-        payload[offset++] = ']';
-        payload[offset] = '\0';
-    }
-
-    return publish("crop/available", payload, true);
 }
 
 bool MQTTService::publishCurrentCrop(const CropProfile* profile)
