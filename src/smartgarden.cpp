@@ -24,6 +24,8 @@ constexpr uint8_t SOIL_POTASSIUM_REGISTER = 6;
 constexpr uint8_t SOIL_EC_REGISTER = 9;
 constexpr uint8_t SOIL_SALINITY_REGISTER = 35;
 constexpr uint8_t SOIL_TDS_REGISTER = 36;
+constexpr uint16_t SENSOR_EXPIRE_AFTER_SECONDS = 20;
+constexpr uint16_t SYSTEM_EXPIRE_AFTER_SECONDS = 90;
 
 const char* const RELAY_NAMES[RELAY_COUNT] = {
     "Fan", "Heater", "Cooler", "Humidifier",
@@ -278,7 +280,8 @@ void publishSensorDiscovery(const char* objectId,
                             const char* unit,
                             const char* deviceClass,
                             const char* stateClass,
-                            const char* icon) {
+                            const char* icon,
+                            uint16_t expireAfterSeconds) {
     char topic[128];
     StaticJsonDocument<512> doc;
 
@@ -297,6 +300,7 @@ void publishSensorDiscovery(const char* objectId,
     if (icon != nullptr) {
         doc["icon"] = icon;
     }
+    doc["expire_after"] = expireAfterSeconds;
     addAvailability(doc);
     addDeviceMetadata(doc);
 
@@ -372,20 +376,20 @@ void publishCropSelectDiscovery() {
 void publishDiscoveryMessages() {
     Serial.println("\n[MQTT Discovery] Publishing Home Assistant discovery...");
 
-    publishSensorDiscovery("smartgarden_air_temp", "Air Temperature", MQTT_TOPIC_AIR_TEMP, "°C", "temperature", "measurement", "mdi:thermometer");
-    publishSensorDiscovery("smartgarden_air_humidity", "Air Humidity", MQTT_TOPIC_AIR_HUMIDITY, "%", "humidity", "measurement", "mdi:water-percent");
-    publishSensorDiscovery("smartgarden_soil_moisture", "Soil Moisture", MQTT_TOPIC_SOIL_MOISTURE, "%", nullptr, "measurement", "mdi:water");
-    publishSensorDiscovery("smartgarden_soil_temp", "Soil Temperature", MQTT_TOPIC_SOIL_TEMP, "°C", "temperature", "measurement", "mdi:thermometer");
-    publishSensorDiscovery("smartgarden_ph", "Soil pH", MQTT_TOPIC_PH, "pH", nullptr, "measurement", "mdi:test-tube");
-    publishSensorDiscovery("smartgarden_ec", "Soil EC", MQTT_TOPIC_EC, "µS/cm", nullptr, "measurement", "mdi:flash");
-    publishSensorDiscovery("smartgarden_nitrogen", "Nitrogen", MQTT_TOPIC_NITROGEN, "mg/kg", nullptr, "measurement", "mdi:leaf");
-    publishSensorDiscovery("smartgarden_phosphorus", "Phosphorus", MQTT_TOPIC_PHOSPHORUS, "mg/kg", nullptr, "measurement", "mdi:leaf");
-    publishSensorDiscovery("smartgarden_potassium", "Potassium", MQTT_TOPIC_POTASSIUM, "mg/kg", nullptr, "measurement", "mdi:leaf");
-    publishSensorDiscovery("smartgarden_salinity", "Soil Salinity", MQTT_TOPIC_SALINITY, "ppt", nullptr, "measurement", "mdi:shaker");
-    publishSensorDiscovery("smartgarden_tds", "Soil TDS", MQTT_TOPIC_TDS, "ppm", nullptr, "measurement", "mdi:waves");
-    publishSensorDiscovery("smartgarden_rssi", "WiFi RSSI", MQTT_TOPIC_RSSI, "dBm", "signal_strength", "measurement", "mdi:wifi");
-    publishSensorDiscovery("smartgarden_uptime", "Uptime", MQTT_TOPIC_UPTIME, "s", "duration", "measurement", "mdi:timer-outline");
-    publishSensorDiscovery("smartgarden_free_heap", "Free Heap", MQTT_TOPIC_FREE_HEAP, "B", nullptr, "measurement", "mdi:memory");
+    publishSensorDiscovery("smartgarden_air_temp", "Air Temperature", MQTT_TOPIC_AIR_TEMP, "°C", "temperature", "measurement", "mdi:thermometer", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_air_humidity", "Air Humidity", MQTT_TOPIC_AIR_HUMIDITY, "%", "humidity", "measurement", "mdi:water-percent", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_soil_moisture", "Soil Moisture", MQTT_TOPIC_SOIL_MOISTURE, "%", nullptr, "measurement", "mdi:water", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_soil_temp", "Soil Temperature", MQTT_TOPIC_SOIL_TEMP, "°C", "temperature", "measurement", "mdi:thermometer", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_ph", "Soil pH", MQTT_TOPIC_PH, "pH", nullptr, "measurement", "mdi:test-tube", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_ec", "Soil EC", MQTT_TOPIC_EC, "µS/cm", nullptr, "measurement", "mdi:flash", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_nitrogen", "Nitrogen", MQTT_TOPIC_NITROGEN, "mg/kg", nullptr, "measurement", "mdi:leaf", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_phosphorus", "Phosphorus", MQTT_TOPIC_PHOSPHORUS, "mg/kg", nullptr, "measurement", "mdi:leaf", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_potassium", "Potassium", MQTT_TOPIC_POTASSIUM, "mg/kg", nullptr, "measurement", "mdi:leaf", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_salinity", "Soil Salinity", MQTT_TOPIC_SALINITY, "ppt", nullptr, "measurement", "mdi:shaker", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_tds", "Soil TDS", MQTT_TOPIC_TDS, "ppm", nullptr, "measurement", "mdi:waves", SENSOR_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_rssi", "WiFi RSSI", MQTT_TOPIC_RSSI, "dBm", "signal_strength", "measurement", "mdi:wifi", SYSTEM_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_uptime", "Uptime", MQTT_TOPIC_UPTIME, "s", "duration", "measurement", "mdi:timer-outline", SYSTEM_EXPIRE_AFTER_SECONDS);
+    publishSensorDiscovery("smartgarden_free_heap", "Free Heap", MQTT_TOPIC_FREE_HEAP, "B", nullptr, "measurement", "mdi:memory", SYSTEM_EXPIRE_AFTER_SECONDS);
 
     for (uint8_t i = 0; i < RELAY_COUNT; ++i) {
         publishRelayDiscovery(i);
