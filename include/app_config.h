@@ -54,6 +54,8 @@
 #define MQTT_TOPIC_RELAY_4_STATE MQTT_BASE_TOPIC "/relay/4/state"
 #define MQTT_TOPIC_RELAY_5_STATE MQTT_BASE_TOPIC "/relay/5/state"
 #define MQTT_TOPIC_RELAY_6_STATE MQTT_BASE_TOPIC "/relay/6/state"
+#define MQTT_TOPIC_RELAY_7_STATE MQTT_BASE_TOPIC "/relay/7/state"
+#define MQTT_TOPIC_RELAY_8_STATE MQTT_BASE_TOPIC "/relay/8/state"
 
 #define MQTT_TOPIC_RELAY_1_SET MQTT_BASE_TOPIC "/relay/1/set"
 #define MQTT_TOPIC_RELAY_2_SET MQTT_BASE_TOPIC "/relay/2/set"
@@ -61,6 +63,8 @@
 #define MQTT_TOPIC_RELAY_4_SET MQTT_BASE_TOPIC "/relay/4/set"
 #define MQTT_TOPIC_RELAY_5_SET MQTT_BASE_TOPIC "/relay/5/set"
 #define MQTT_TOPIC_RELAY_6_SET MQTT_BASE_TOPIC "/relay/6/set"
+#define MQTT_TOPIC_RELAY_7_SET MQTT_BASE_TOPIC "/relay/7/set"
+#define MQTT_TOPIC_RELAY_8_SET MQTT_BASE_TOPIC "/relay/8/set"
 
 // Backward-compatible aliases for service modules
 #define MQTT_TOPIC_FAN MQTT_TOPIC_RELAY_1_STATE

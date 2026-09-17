@@ -36,6 +36,8 @@ static const char* relayStateTopicByIndex(int relayIndex) {
         case 3: return MQTT_TOPIC_RELAY_4_STATE;
         case 4: return MQTT_TOPIC_RELAY_5_STATE;
         case 5: return MQTT_TOPIC_RELAY_6_STATE;
+        case 6: return MQTT_TOPIC_RELAY_7_STATE;
+        case 7: return MQTT_TOPIC_RELAY_8_STATE;
         default: return nullptr;
     }
 }
@@ -48,6 +50,8 @@ static const char* relayCommandTopicByIndex(int relayIndex) {
         case 3: return MQTT_TOPIC_RELAY_4_SET;
         case 4: return MQTT_TOPIC_RELAY_5_SET;
         case 5: return MQTT_TOPIC_RELAY_6_SET;
+        case 6: return MQTT_TOPIC_RELAY_7_SET;
+        case 7: return MQTT_TOPIC_RELAY_8_SET;
         default: return nullptr;
     }
 }
@@ -133,7 +137,7 @@ static void publishDiscoveryMessages() {
         MQTT_TOPIC_DIAG_RSSI, av, deviceInfo);
     publishDiscoveryMessage("homeassistant/sensor/smartgarden_rssi/config", buffer);
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < RELAY_COUNT; i++) {
         const char* cmdTopic = relayCommandTopicByIndex(i);
         const char* stateTopic = relayStateTopicByIndex(i);
         if (!cmdTopic || !stateTopic) continue;
@@ -168,7 +172,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
     Serial.printf("[MQTT RX] %s = %s\n", topic, msg.c_str());
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < RELAY_COUNT; i++) {
         const char* cmdTopic = relayCommandTopicByIndex(i);
         if (cmdTopic && String(topic) == cmdTopic) {
             if (msg == "ON") setRelay(i, true);
@@ -215,7 +219,7 @@ static void ensureMqttConnected() {
         client.publish(MQTT_TOPIC_CROP_SELECT_STATE, "lettuce", true);
         client.publish(MQTT_TOPIC_DIAG_RSSI, String(WiFi.RSSI()).c_str(), true);
 
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < RELAY_COUNT; i++) {
             const char* cmdTopic = relayCommandTopicByIndex(i);
             if (cmdTopic) client.subscribe(cmdTopic);
         }

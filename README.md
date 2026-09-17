@@ -95,8 +95,8 @@ smartgarden/sensors/nitrogen
 smartgarden/sensors/phosphorus
 smartgarden/sensors/potassium
 
-smartgarden/relay/1/state ... smartgarden/relay/6/state
-smartgarden/relay/1/set   ... smartgarden/relay/6/set
+smartgarden/relay/1/state ... smartgarden/relay/8/state
+smartgarden/relay/1/set   ... smartgarden/relay/8/set
 ```
 
 ## 🔧 Cấu Hình
@@ -176,7 +176,16 @@ mosquitto_sub -h 192.168.1.100 -t "smartgarden/crop/config"
 - RS485 (Modbus): RX=16, TX=17, DE/RE=18
 
 ### Relay
-- Relay 1..8: theo `include/pins.h` (`RELAY_PINS[]` là nguồn chuẩn)
+- Relay 1: GPIO32
+- Relay 2: GPIO33
+- Relay 3: GPIO25
+- Relay 4: GPIO26
+- Relay 5: GPIO27
+- Relay 6: GPIO14
+- Relay 7: GPIO12
+- Relay 8: GPIO13
+  
+`include/pins.h` (`RELAY_PINS[]`) là nguồn chuẩn cho firmware.
 
 ## 📝 Cách Thêm Loại Cây Mới
 
