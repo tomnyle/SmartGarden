@@ -15,7 +15,7 @@ void mqttMessageCallback(char* topic, byte* payload, unsigned int length) {
 MQTTService::MQTTService(const char* broker, int port)
     : client(nullptr), mqttBroker(broker), mqttPort(port), connected(false),
       lastPublishTime(0), publishInterval(5000), lastDiscoveryTime(0),
-      relayCallback(nullptr), cropCallback(nullptr)
+      relayCallback(nullptr), cropCallback(nullptr), modeCallback(nullptr)
 {
     snprintf(deviceId, sizeof(deviceId), "SmartGarden_%llu", (unsigned long long)ESP.getEfuseMac());
     memset(mqttUsername, 0, sizeof(mqttUsername));
@@ -46,6 +46,7 @@ void MQTTService::begin(const char* username, const char* password)
 
 void MQTTService::setRelayCommandCallback(RelayCommandCallback callback) { relayCallback = callback; }
 void MQTTService::setCropSelectCallback(CropSelectCallback callback) { cropCallback = callback; }
+void MQTTService::setModeSelectCallback(ModeSelectCallback callback) { modeCallback = callback; }
 
 bool MQTTService::connect()
 {
@@ -242,6 +243,12 @@ void MQTTService::handleCropSelect(const char* payload)
     if (cropCallback) cropCallback(payload);
 }
 
+void MQTTService::handleModeSelect(const char* payload)
+{
+    Serial.printf("[MQTT] Mode select: %s\n", payload);
+    if (modeCallback) modeCallback(payload);
+}
+
 void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int length)
 {
     char message[128];
@@ -260,6 +267,8 @@ void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int len
         }
     } else if (topicStr == MQTT_TOPIC_CROP_SELECT) {
         handleCropSelect(message);
+    } else if (topicStr == MQTT_TOPIC_MODE_SET) {
+        handleModeSelect(message);
     }
 }
 

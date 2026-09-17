@@ -217,7 +217,8 @@ static void readRS485Sensors()
     }
 
     float parsedSoilMoisture = (response[3] << 8 | response[4]) / 10.0f;
-    float parsedSoilTemp = (response[5] << 8 | response[6]) / 10.0f;
+    int16_t rawSoilTemp = static_cast<int16_t>((response[5] << 8) | response[6]);
+    float parsedSoilTemp = rawSoilTemp / 10.0f;
     float parsedPh = (response[7] << 8 | response[8]) / 10.0f;
 
     if (parsedSoilMoisture < 0.0f || parsedSoilMoisture > 100.0f || parsedPh < 0.0f || parsedPh > 14.0f) {
