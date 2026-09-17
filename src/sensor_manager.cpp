@@ -1,4 +1,6 @@
 #include "sensor_manager.h"
+#include "app_config.h"
+#include "pins.h"
 #include <Arduino.h>
 #include <DHT.h>
 #include <HardwareSerial.h>
@@ -6,13 +8,8 @@
 // Declare as extern - defined in main.cpp
 extern DHT dht;
 
-// RS485 Serial (Serial2 on ESP32)
-#define RS485_RX 16
-#define RS485_TX 17
-#define RS485_DE 18
-
 SensorManager::SensorManager()
-    : lastReadTime(0), readInterval(5000)
+    : lastReadTime(0), readInterval(SENSOR_READ_INTERVAL)
 {
     memset(&currentSnapshot, 0, sizeof(SensorSnapshot));
     // Set default values for testing

@@ -4,7 +4,8 @@
 #include "app_config.h"
 
 ClimateManager::ClimateManager()
-    : currentProfile(nullptr), lastControlTime(0), controlInterval(10000)
+    : relayManager(nullptr), currentProfile(nullptr), lastControlTime(0),
+      controlInterval(CLIMATE_CONTROL_INTERVAL)
 {
 }
 

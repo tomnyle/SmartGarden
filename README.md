@@ -1,219 +1,103 @@
-# SmartGarden - Hệ thống quản lý vườn thông minh đa loại cây
+# SmartGarden (ESP32 + Home Assistant MQTT)
 
-## 📋 Giới thiệu
+## 1) Tổng quan kiến trúc
+Firmware chạy trên ESP32 (PlatformIO `env:esp32dev`), gồm các phần chính:
+- Đọc DHT22 (nhiệt độ/độ ẩm không khí).
+- Đọc RS485 (soil/NPK) ở mức tích hợp khung Modbus cơ bản, cần kiểm chứng thực địa.
+- Điều khiển 8 relay active-low.
+- MQTT runtime qua namespace `smartgarden/...`.
+- Home Assistant MQTT Discovery qua namespace `homeassistant/.../config`.
 
-SmartGarden là một hệ thống IoT hoàn chỉnh cho phép quản lý **13 loại cây trồng** khác nhau với các thông số tối ưu riêng cho từng loại. Hệ thống tự động điều khiển các relay (bơm nước, quạt, đèn, v.v.) dựa trên dữ liệu cảm biến và yêu cầu của từng loại cây.
+## 2) Chế độ vận hành
+- `manual`: cho phép điều khiển relay thủ công từ Home Assistant/MQTT.
+- `auto`: firmware tự điều khiển relay climate theo dữ liệu DHT22 + crop profile; bỏ qua lệnh relay thủ công.
+- `monitor`: chỉ giám sát, tắt toàn bộ relay và bỏ qua lệnh relay thủ công.
 
-## 🌿 Các Loại Cây Hỗ Trợ (13 loại)
+> Lưu ý an toàn: firmware **không tự bật irrigation** khi dữ liệu soil/RS485 chưa đọc thành công và chưa hợp lệ.
 
-### 🌱 Loại Cây Quý Hiếm
-| Loại Cây | Tên Khoa Học | Nhiệt độ | Ẩm đất | pH | EC |
-|---------|---------|---------|---------|-----|--------|
-| 🌿 **Sâm Ngọc Linh** | Panax Notoginseng | 15-22°C | 70-80% | 5.5-6.5 | 1.2-2.0 |
-| 🌿 **Tam Thất** | Salvia Miltiorrhiza | 18-24°C | 60-75% | 6.0-7.0 | 1.5-2.5 |
-| 🌿 **Ba Kích** | Morinda Citrifolia | 22-28°C | 65-78% | 6.0-7.0 | 2.0-3.0 |
+## 3) Sơ đồ chân (đang dùng trong code)
+- DHT22: GPIO4
+- RS485: RX=GPIO16, TX=GPIO17, DE/RE=GPIO18
+- Relay 1..8: GPIO32, 33, 25, 26, 27, 14, 12, 13
+- Relay active-low: `LOW=ON`, `HIGH=OFF`
 
-### 🥬 Loại Rau Ăn Lá
-| Loại Cây | Tên Khoa Học | Nhiệt độ | Ẩm đất | pH | EC |
-|---------|---------|---------|---------|-----|--------|
-| 🥬 **Rau Cải Xoăn** | Lactuca sativa | 18-24°C | 45-65% | 5.8-6.5 | 1.0-1.8 |
-| 🌾 **Rau Mầm** | Microgreens | 15-22°C | 70-85% | 6.5-7.0 | 1.0-2.0 |
+Chi tiết wiring: xem `docs/WIRING.md`.
 
-### 🍅 Loại Cây Ăn Quả
-| Loại Cây | Tên Khoa Học | Nhiệt độ | Ẩm đất | pH | EC |
-|---------|---------|---------|---------|-----|--------|
-| 🍅 **Cà Chua** | Solanum lycopersicum | 20-28°C | 50-70% | 5.5-6.8 | 2.0-3.5 |
-| 🍓 **Dâu Tây** | Fragaria vesca | 15-25°C | 60-75% | 5.5-6.8 | 1.2-2.0 |
-| 🥒 **Dưa Chuột** | Cucumis sativus | 22-30°C | 50-65% | 6.0-7.0 | 2.5-4.0 |
-| 🌶️ **Ớt** | Capsicum annuum | 24-28°C | 60-70% | 6.0-6.8 | 2.0-3.5 |
-| 🍆 **Cà Tím** | Solanum melongena | 20-28°C | 50-70% | 5.5-6.5 | 1.8-3.0 |
+## 4) MQTT topics
 
-### 🥕 Loại Rau Quả Khác
-| Loại Cây | Tên Khoa Học | Nhiệt độ | Ẩm đất | pH | EC |
-|---------|---------|---------|---------|-----|--------|
-| 🥕 **Cà Rốt** | Daucus carota | 15-20°C | 65-75% | 6.0-6.8 | 1.5-2.5 |
-| 🧅 **Hành Tây** | Allium cepa | 13-18°C | 60-70% | 6.0-7.5 | 1.2-2.0 |
-| 🥦 **Súp Lơ** | Brassica oleracea | 15-22°C | 65-75% | 6.0-7.5 | 1.5-2.5 |
+### Runtime (`smartgarden/...`)
+- Availability: `smartgarden/availability` (`online`/`offline`)
+- Sensors:
+  - `smartgarden/sensors/air_temp`
+  - `smartgarden/sensors/air_humidity`
+  - `smartgarden/sensors/soil_moisture`
+  - `smartgarden/sensors/soil_temp`
+  - `smartgarden/sensors/ph`
+  - `smartgarden/sensors/ec`
+  - `smartgarden/sensors/nitrogen`
+  - `smartgarden/sensors/phosphorus`
+  - `smartgarden/sensors/potassium`
+- Relay state/command:
+  - `smartgarden/relay/<1..8>/state`
+  - `smartgarden/relay/<1..8>/set` (`ON`/`OFF`)
+- Crop profile:
+  - command: `smartgarden/crop/set`
+  - state: `smartgarden/crop/state`
+- Operation mode:
+  - command: `smartgarden/mode/set`
+  - state: `smartgarden/mode/state`
 
-## 🚀 Các Tính Năng Chính
+### Discovery (`homeassistant/.../config`)
+Firmware publish discovery cho:
+- 9 sensor
+- 8 switch (relay)
+- 1 select crop profile
+- 1 select operation mode
 
-### ✨ **1. Quản lý Đa Loại Cây**
-- Lưu trữ profile cho 16 loại cây (hiện tại 13 loại)
-- Mỗi profile chứa thông số tối ưu riêng
-- Dễ dàng thêm loại cây mới
-- Lưu trữ persistent trong EEPROM
+Chi tiết tích hợp HA: `docs/HOME_ASSISTANT.md`.
 
-### 🤖 **2. Điều Khiển Tự Động**
-- Tự động bật/tắt relay dựa trên:
-  - Thông số cảm biến hiện tại
-  - Loại cây được chọn
-  - Thời gian trong ngày
-- Điều khiển ưu tiên: Soil humidity > Time-based rules
-
-### 🚨 **3. Hệ Thống Cảnh Báo**
-- Báo động real-time khi thông số ngoài phạm vi
-- Thông báo qua MQTT
-- Lưu lịch sử cảnh báo
-
-### 📊 **4. Giám Sát & Logging**
-- Ghi lại lịch sử dữ liệu từ cảm biến
-- Theo dõi xu hướng theo thời gian
-- Xuất dữ liệu qua MQTT
-
-### 🌐 **5. MQTT Integration**
-- Quản lý cây qua MQTT topics
-- Tích hợp Home Assistant
-- Điều khiển từ điện thoại/web
-
-### 💾 **6. Lưu Trữ An Toàn**
-- Cấu hình lưu trong EEPROM
-- Không mất dữ liệu khi mất điện
-- Tự động load khi khởi động
-
-## 📡 MQTT Topics
-
-```
-# Quản lý Cây
-smartgarden/crop/list              → Danh sách tất cả loại cây
-smartgarden/crop/set               → Chọn loại cây (Payload: "lettuce")
-smartgarden/crop/current           → Loại cây hiện tại
-smartgarden/crop/config            → Cấu hình loại cây hiện tại (JSON)
-
-# Dữ liệu Cảm Biến
-smartgarden/sensors/air_temp       → Nhiệt độ không khí (°C)
-smartgarden/sensors/air_humidity   → Độ ẩm không khí (%)
-smartgarden/sensors/soil_moisture  → Độ ẩm đất (%)
-smartgarden/sensors/soil_temp      → Nhiệt độ đất (°C)
-smartgarden/sensors/ph             → Giá trị pH
-smartgarden/sensors/ec             → Độ dẫn điện (uS/cm)
-smartgarden/sensors/nitrogen       → Nitrogen (mg/kg)
-smartgarden/sensors/phosphorus     → Phosphorus (mg/kg)
-smartgarden/sensors/potassium      → Potassium (mg/kg)
-
-# Relay & Điều Khiển
-smartgarden/relay/1/state          → Trạng thái relay 1
-smartgarden/relay/1/set            → Điều khiển relay 1
-smartgarden/autocontrol/state      → Trạng thái auto control
-
-# Cảnh Báo
-smartgarden/alerts                 → Các cảnh báo thời gian thực
-```
-
-## 🔧 Cấu Hình
-
-### WiFi & MQTT
-Chỉnh sửa trong `include/config.h`:
-```cpp
-#define SMARTGARDEN_WIFI_SSID "YOUR_WIFI_SSID"
-#define SMARTGARDEN_WIFI_PASSWORD "YOUR_PASSWORD"
-#define SMARTGARDEN_MQTT_HOST "192.168.1.100"
-#define SMARTGARDEN_MQTT_PORT 1883
-#define SMARTGARDEN_MQTT_USERNAME "username"
-#define SMARTGARDEN_MQTT_PASSWORD "password"
-```
-
-### Chọn Loại Cây
-```
-Topic: smartgarden/crop/set
-Payload: "lettuce"  (hoặc: tomato, ginseng, salvia, morinda, strawberry, v.v.)
-```
-
-## 🏗️ Cấu Trúc Code
-
-```
-SmartGarden/
-├── src/
-│   └── smartgarden.ino          # Main firmware
-├── include/
-│   ├── config.h                  # Cấu hình tập trung
-│   ├── crop_profiles.h           # Định nghĩa loại cây
-│   ├── auto_control.h            # Logic điều khiển
-│   └── mqtt_handler.h            # MQTT topics
-├── platformio.ini                # Build config
-└── README.md                      # Tài liệu này
-```
-
-## 📦 Thư Viện Cần Thiết
-
-```
-- WiFi (built-in ESP32)
-- PubSubClient (MQTT)
-- DHT (Cảm biến nhiệt độ/độ ẩm)
-- ModbusMaster (Đọc cảm biến đất)
-- Preferences (EEPROM storage)
-```
-
-## ⚡ Lưu Ý Quan Trọng
-
-1. **Thông số mặc định**: Nếu không đặt WiFi/MQTT, hệ thống sẽ dùng placeholder
-2. **Bơm nước mặc định**: Relay 0 được dùng cho bơm tưới
-3. **Thời gian cập nhật**: Mỗi 5 giây
-4. **Lưu trữ**: Tối đa 16 loại cây
-
-## 🎯 Ví Dụ Sử Dụng
-
-### Chọn Sâm Ngọc Linh
+## 5) Build & upload (PlatformIO)
 ```bash
-mosquitto_pub -h 192.168.1.100 -t "smartgarden/crop/set" -m "ginseng"
+pio run -e esp32dev
+pio run -e esp32dev -t upload
+pio device monitor -b 115200
 ```
 
-### Liệt kê tất cả loại cây
+Nếu máy không có `pio`:
 ```bash
-mosquitto_sub -h 192.168.1.100 -t "smartgarden/crop/list"
-# Response: lettuce,tomato,ginseng,salvia,morinda,strawberry,cucumber,chili,carrot,onion,eggplant,microgreens,broccoli
+pip install platformio
 ```
 
-### Xem cấu hình hiện tại
+## 6) Cấu hình
+Cấu hình tập trung tại:
+- `include/app_config.h` (Wi-Fi, MQTT, topic, interval)
+- `include/pins.h` (toàn bộ pin)
+
+Khuyến nghị: chuyển credential thật sang `include/secrets.h` (file local, không commit).
+
+## 7) Kiểm tra nhanh MQTT
 ```bash
-mosquitto_sub -h 192.168.1.100 -t "smartgarden/crop/config"
+# kiểm tra mode hiện tại
+mosquitto_sub -h <broker> -t smartgarden/mode/state -v
+
+# set manual
+mosquitto_pub -h <broker> -t smartgarden/mode/set -m manual
+
+# bật relay 1 (chỉ có hiệu lực khi manual)
+mosquitto_pub -h <broker> -t smartgarden/relay/1/set -m ON
+
+# xem trạng thái relay
+mosquitto_sub -h <broker> -t smartgarden/relay/+/state -v
 ```
 
-## 🔌 Kế Nối Phần Cứng
+## 8) Giới hạn hiện tại
+- DHT22: đã tích hợp đọc runtime.
+- RS485/soil/NPK: có khung đọc và publish, nhưng cần kiểm chứng với phần cứng thực tế (địa chỉ slave, baudrate, bản đồ thanh ghi, CRC/khung phản hồi theo sensor thực dùng).
+- Không tuyên bố RS485/NPK đã fully production-ready khi chưa xác minh thực địa.
 
-### Cảm Biến
-- DHT22: Pin 15
-- RS485 (Modbus): RX=16, TX=17, DE/RE=4
+## 9) Troubleshooting
+- Không thấy entity HA: kiểm tra MQTT Discovery đã bật và xem `homeassistant/#`.
+- Relay không chạy đúng: kiểm tra module có active-low, nguồn relay riêng, mass chung.
+- Auto không tưới: kiểm tra dữ liệu RS485 hợp lệ; nếu chưa hợp lệ, firmware chủ động không bật irrigation.
 
-### Relay
-- Relay 0: Pin 5   (Bơm nước)
-- Relay 1: Pin 18  (Quạt)
-- Relay 2: Pin 19  (Đèn)
-- Relay 3: Pin 27  (Phân bón)
-- Relay 4: Pin 32
-- Relay 5: Pin 33
-- Relay 6: Pin 25
-- Relay 7: Pin 26
-
-## 📝 Cách Thêm Loại Cây Mới
-
-Thêm vào `loadDefaults()` trong `include/crop_profiles.h`:
-```cpp
-CropProfile newCrop = makeProfile(
-    "crop_name",
-    {tempMin, tempMax},
-    {humidityMin, humidityMax},
-    {soilMin, soilMax},
-    {phMin, phMax},
-    {ecMin, ecMax},
-    {nMin, nMax},
-    {pMin, pMax},
-    {kMin, kMax},
-    irrigationDurationMs);
-newCrop.relayRules[0] = {0, onTimeMs, offTimeMs};
-newCrop.relayRuleCount = 1;
-create(newCrop);
-```
-
-## 📄 License
-
-Mở rộng dự án SmartGarden - tomnyle
-
-## 🤝 Đóng Góp
-
-Chào mừng các đóng góp! Vui lòng tạo Pull Request để thêm loại cây mới hoặc cải thiện tính năng.
-
----
-
-**Phiên bản**: 1.0.0  
-**Cập nhật**: 2026-08-19  
-**Trạng thái**: ✅ Hoàn thành 13 loại cây
+Xem checklist test chi tiết ở `docs/TESTING.md`.

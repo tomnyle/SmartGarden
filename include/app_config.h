@@ -28,36 +28,47 @@
 #define MQTT_RECONNECT_INTERVAL 5000
 #define MQTT_BUFFER_SIZE 512
 
-// ==================== MQTT TOPICS (Home Assistant Format) ====================
+// ==================== MQTT TOPICS ====================
+// Runtime Topics Prefix
+#define MQTT_RUNTIME_PREFIX "smartgarden"
+
+// Availability
+#define MQTT_TOPIC_AVAILABILITY MQTT_RUNTIME_PREFIX "/availability"
+
 // Sensor Topics - State
-#define MQTT_TOPIC_AIR_TEMP HA_DISCOVERY_PREFIX "/sensor/smartgarden_air_temp/state"
-#define MQTT_TOPIC_AIR_HUMIDITY HA_DISCOVERY_PREFIX "/sensor/smartgarden_air_humidity/state"
-#define MQTT_TOPIC_SOIL_MOISTURE HA_DISCOVERY_PREFIX "/sensor/smartgarden_soil_moisture/state"
-#define MQTT_TOPIC_SOIL_TEMP HA_DISCOVERY_PREFIX "/sensor/smartgarden_soil_temp/state"
-#define MQTT_TOPIC_PH HA_DISCOVERY_PREFIX "/sensor/smartgarden_ph/state"
-#define MQTT_TOPIC_EC HA_DISCOVERY_PREFIX "/sensor/smartgarden_ec/state"
-#define MQTT_TOPIC_NITROGEN HA_DISCOVERY_PREFIX "/sensor/smartgarden_nitrogen/state"
-#define MQTT_TOPIC_PHOSPHORUS HA_DISCOVERY_PREFIX "/sensor/smartgarden_phosphorus/state"
-#define MQTT_TOPIC_POTASSIUM HA_DISCOVERY_PREFIX "/sensor/smartgarden_potassium/state"
+#define MQTT_TOPIC_AIR_TEMP MQTT_RUNTIME_PREFIX "/sensors/air_temp"
+#define MQTT_TOPIC_AIR_HUMIDITY MQTT_RUNTIME_PREFIX "/sensors/air_humidity"
+#define MQTT_TOPIC_SOIL_MOISTURE MQTT_RUNTIME_PREFIX "/sensors/soil_moisture"
+#define MQTT_TOPIC_SOIL_TEMP MQTT_RUNTIME_PREFIX "/sensors/soil_temp"
+#define MQTT_TOPIC_PH MQTT_RUNTIME_PREFIX "/sensors/ph"
+#define MQTT_TOPIC_EC MQTT_RUNTIME_PREFIX "/sensors/ec"
+#define MQTT_TOPIC_NITROGEN MQTT_RUNTIME_PREFIX "/sensors/nitrogen"
+#define MQTT_TOPIC_PHOSPHORUS MQTT_RUNTIME_PREFIX "/sensors/phosphorus"
+#define MQTT_TOPIC_POTASSIUM MQTT_RUNTIME_PREFIX "/sensors/potassium"
 
 // Relay/Switch Topics - State & Command
-#define MQTT_TOPIC_FAN HA_DISCOVERY_PREFIX "/switch/smartgarden_fan/state"
-#define MQTT_TOPIC_HEATER HA_DISCOVERY_PREFIX "/switch/smartgarden_heater/state"
-#define MQTT_TOPIC_COOLER HA_DISCOVERY_PREFIX "/switch/smartgarden_cooler/state"
-#define MQTT_TOPIC_HUMIDIFIER HA_DISCOVERY_PREFIX "/switch/smartgarden_humidifier/state"
-#define MQTT_TOPIC_DEHUMIDIFIER HA_DISCOVERY_PREFIX "/switch/smartgarden_dehumidifier/state"
-#define MQTT_TOPIC_IRRIGATION HA_DISCOVERY_PREFIX "/switch/smartgarden_irrigation/state"
+#define MQTT_TOPIC_FAN MQTT_RUNTIME_PREFIX "/relay/1/state"
+#define MQTT_TOPIC_HEATER MQTT_RUNTIME_PREFIX "/relay/2/state"
+#define MQTT_TOPIC_COOLER MQTT_RUNTIME_PREFIX "/relay/3/state"
+#define MQTT_TOPIC_HUMIDIFIER MQTT_RUNTIME_PREFIX "/relay/4/state"
+#define MQTT_TOPIC_DEHUMIDIFIER MQTT_RUNTIME_PREFIX "/relay/5/state"
+#define MQTT_TOPIC_IRRIGATION MQTT_RUNTIME_PREFIX "/relay/6/state"
 
-#define MQTT_TOPIC_CONTROL_FAN HA_DISCOVERY_PREFIX "/switch/smartgarden_fan/command"
-#define MQTT_TOPIC_CONTROL_HEATER HA_DISCOVERY_PREFIX "/switch/smartgarden_heater/command"
-#define MQTT_TOPIC_CONTROL_COOLER HA_DISCOVERY_PREFIX "/switch/smartgarden_cooler/command"
-#define MQTT_TOPIC_CONTROL_HUMIDIFIER HA_DISCOVERY_PREFIX "/switch/smartgarden_humidifier/command"
-#define MQTT_TOPIC_CONTROL_DEHUMIDIFIER HA_DISCOVERY_PREFIX "/switch/smartgarden_dehumidifier/command"
-#define MQTT_TOPIC_CONTROL_IRRIGATION HA_DISCOVERY_PREFIX "/switch/smartgarden_irrigation/command"
+#define MQTT_TOPIC_CONTROL_FAN MQTT_RUNTIME_PREFIX "/relay/1/set"
+#define MQTT_TOPIC_CONTROL_HEATER MQTT_RUNTIME_PREFIX "/relay/2/set"
+#define MQTT_TOPIC_CONTROL_COOLER MQTT_RUNTIME_PREFIX "/relay/3/set"
+#define MQTT_TOPIC_CONTROL_HUMIDIFIER MQTT_RUNTIME_PREFIX "/relay/4/set"
+#define MQTT_TOPIC_CONTROL_DEHUMIDIFIER MQTT_RUNTIME_PREFIX "/relay/5/set"
+#define MQTT_TOPIC_CONTROL_IRRIGATION MQTT_RUNTIME_PREFIX "/relay/6/set"
 
-// Status & Crop Select
-#define MQTT_TOPIC_STATUS HA_DISCOVERY_PREFIX "/switch/smartgarden_status/state"
-#define MQTT_TOPIC_CROP_SELECT HA_DISCOVERY_PREFIX "/select/smartgarden_crop/command"
+// Status, Crop Select and Operation Mode
+#define MQTT_TOPIC_STATUS MQTT_RUNTIME_PREFIX "/status"
+#define MQTT_TOPIC_CROP_SELECT MQTT_RUNTIME_PREFIX "/crop/set"
+#define MQTT_TOPIC_CROP_STATE MQTT_RUNTIME_PREFIX "/crop/state"
+#define MQTT_TOPIC_CROP_LIST MQTT_RUNTIME_PREFIX "/crop/list"
+#define MQTT_TOPIC_MODE_SET MQTT_RUNTIME_PREFIX "/mode/set"
+#define MQTT_TOPIC_MODE_STATE MQTT_RUNTIME_PREFIX "/mode/state"
+#define MQTT_TOPIC_UPTIME MQTT_RUNTIME_PREFIX "/uptime"
 
 // ==================== SENSOR CONFIGURATION ====================
 #define SENSOR_READ_INTERVAL 5000
