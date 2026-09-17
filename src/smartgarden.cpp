@@ -3,6 +3,7 @@
 #include <PubSubClient.h>
 #include <DHT.h>
 #include <ModbusMaster.h>
+#include <ArduinoJson.h>
 
 #include "app_config.h"
 #include "pins.h"
@@ -12,6 +13,17 @@ namespace {
 constexpr uint8_t RELAY_COUNT = 8;
 constexpr uint16_t MODBUS_START_REGISTER = 0x0000;
 constexpr uint16_t MODBUS_REGISTER_COUNT = 40;
+
+// Confirmed register map for the SmartGarden RS485/NPK soil sensor.
+constexpr uint8_t SOIL_MOISTURE_REGISTER = 0;
+constexpr uint8_t SOIL_TEMPERATURE_REGISTER = 1;
+constexpr uint8_t SOIL_PH_REGISTER = 3;
+constexpr uint8_t SOIL_NITROGEN_REGISTER = 4;
+constexpr uint8_t SOIL_PHOSPHORUS_REGISTER = 5;
+constexpr uint8_t SOIL_POTASSIUM_REGISTER = 6;
+constexpr uint8_t SOIL_EC_REGISTER = 9;
+constexpr uint8_t SOIL_SALINITY_REGISTER = 35;
+constexpr uint8_t SOIL_TDS_REGISTER = 36;
 
 const char* const RELAY_NAMES[RELAY_COUNT] = {
     "Fan", "Heater", "Cooler", "Humidifier",
@@ -66,6 +78,7 @@ OperationMode currentMode = OperationMode::MANUAL;
 const CropProfile* currentCrop = nullptr;
 unsigned long lastSensorReadAt = 0;
 unsigned long lastStatusPublishAt = 0;
+unsigned long lastMqttReconnectAttemptAt = 0;
 char mqttClientId[64] = {0};
 
 void preTransmission() {
@@ -233,10 +246,27 @@ void publishSystemState() {
     publishUInt(MQTT_TOPIC_FREE_HEAP, ESP.getFreeHeap());
 }
 
-void publishDiscoveryMessage(const char* topic, const char* payload) {
+void publishDiscoveryMessage(const char* topic, JsonDocument& doc) {
+    char payload[1024];
+    serializeJson(doc, payload, sizeof(payload));
     mqttClient.publish(topic, payload, true);
     delay(25);
     Serial.printf("[HA Discovery] %s => OK\n", topic);
+}
+
+void addAvailability(JsonDocument& doc) {
+    doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+    doc["payload_available"] = "online";
+    doc["payload_not_available"] = "offline";
+}
+
+void addDeviceMetadata(JsonDocument& doc) {
+    JsonObject device = doc["device"].to<JsonObject>();
+    JsonArray identifiers = device["identifiers"].to<JsonArray>();
+    identifiers.add(MQTT_DEVICE_ID);
+    device["name"] = MQTT_DEVICE_NAME;
+    device["manufacturer"] = MQTT_DEVICE_MANUFACTURER;
+    device["model"] = MQTT_DEVICE_MODEL;
 }
 
 void publishSensorDiscovery(const char* objectId,
@@ -247,107 +277,93 @@ void publishSensorDiscovery(const char* objectId,
                             const char* stateClass,
                             const char* icon) {
     char topic[128];
-    char payload[1024];
-    char deviceClassJson[64];
-    char stateClassJson[64];
-    char iconJson[64];
+    StaticJsonDocument<512> doc;
+
+    doc["name"] = name;
+    doc["unique_id"] = objectId;
+    doc["state_topic"] = stateTopic;
+    if (unit != nullptr) {
+        doc["unit_of_measurement"] = unit;
+    }
+    if (deviceClass != nullptr) {
+        doc["device_class"] = deviceClass;
+    }
+    if (stateClass != nullptr) {
+        doc["state_class"] = stateClass;
+    }
+    if (icon != nullptr) {
+        doc["icon"] = icon;
+    }
+    addAvailability(doc);
+    addDeviceMetadata(doc);
+
     snprintf(topic, sizeof(topic), "%s/sensor/%s/config", HA_DISCOVERY_PREFIX, objectId);
-    snprintf(
-        payload,
-        sizeof(payload),
-        "{\"name\":\"%s\",\"unique_id\":\"%s\",\"state_topic\":\"%s\",\"availability_topic\":\"%s\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"unit_of_measurement\":\"%s\",\"device_class\":%s,\"state_class\":%s,\"icon\":%s,\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\"}}",
-        name,
-        objectId,
-        stateTopic,
-        MQTT_TOPIC_AVAILABILITY,
-        unit != nullptr ? unit : "",
-        jsonStringOrNull(deviceClass, deviceClassJson, sizeof(deviceClassJson)),
-        jsonStringOrNull(stateClass, stateClassJson, sizeof(stateClassJson)),
-        jsonStringOrNull(icon, iconJson, sizeof(iconJson)),
-        MQTT_DEVICE_ID,
-        MQTT_DEVICE_NAME,
-        MQTT_DEVICE_MANUFACTURER,
-        MQTT_DEVICE_MODEL);
-    publishDiscoveryMessage(topic, payload);
+    publishDiscoveryMessage(topic, doc);
 }
 
 void publishRelayDiscovery(uint8_t relayIndex) {
     char topic[128];
-    char payload[1024];
     char stateTopic[48];
     char commandTopic[48];
+    StaticJsonDocument<512> doc;
 
     buildRelayStateTopic(relayIndex, stateTopic, sizeof(stateTopic));
     buildRelayCommandTopic(relayIndex, commandTopic, sizeof(commandTopic));
 
+    doc["name"] = RELAY_NAMES[relayIndex];
+    doc["unique_id"] = String("smartgarden_") + RELAY_DISCOVERY_IDS[relayIndex];
+    doc["state_topic"] = stateTopic;
+    doc["command_topic"] = commandTopic;
+    doc["payload_on"] = "ON";
+    doc["payload_off"] = "OFF";
+    doc["icon"] = RELAY_ICONS[relayIndex];
+    addAvailability(doc);
+    addDeviceMetadata(doc);
+
     snprintf(topic, sizeof(topic), "%s/switch/smartgarden_%s/config", HA_DISCOVERY_PREFIX, RELAY_DISCOVERY_IDS[relayIndex]);
-    snprintf(
-        payload,
-        sizeof(payload),
-        "{\"name\":\"%s\",\"unique_id\":\"smartgarden_%s\",\"state_topic\":\"%s\",\"command_topic\":\"%s\",\"availability_topic\":\"%s\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"icon\":\"%s\",\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\"}}",
-        RELAY_NAMES[relayIndex],
-        RELAY_DISCOVERY_IDS[relayIndex],
-        stateTopic,
-        commandTopic,
-        MQTT_TOPIC_AVAILABILITY,
-        RELAY_ICONS[relayIndex],
-        MQTT_DEVICE_ID,
-        MQTT_DEVICE_NAME,
-        MQTT_DEVICE_MANUFACTURER,
-        MQTT_DEVICE_MODEL);
-    publishDiscoveryMessage(topic, payload);
+    publishDiscoveryMessage(topic, doc);
 }
 
-void publishSelectDiscovery(const char* componentId,
-                            const char* name,
-                            const char* stateTopic,
-                            const char* commandTopic,
-                            const char* optionsCsv,
-                            const char* icon) {
+void publishModeSelectDiscovery() {
     char topic[128];
-    char payload[1024];
-    char optionsJson[512] = {0};
-    const char* cursor = optionsCsv;
-    bool first = true;
+    StaticJsonDocument<512> doc;
 
-    strncat(optionsJson, "[", sizeof(optionsJson) - 1);
-    while (*cursor != '\0') {
-        const char* comma = strchr(cursor, ',');
-        size_t len = comma != nullptr ? static_cast<size_t>(comma - cursor) : strlen(cursor);
-        if (!first) {
-            strncat(optionsJson, ",", sizeof(optionsJson) - strlen(optionsJson) - 1);
-        }
-        char optionValue[64] = {0};
-        strncpy(optionValue, cursor, len);
-        optionValue[len] = '\0';
-        strncat(optionsJson, "\"", sizeof(optionsJson) - strlen(optionsJson) - 1);
-        strncat(optionsJson, optionValue, sizeof(optionsJson) - strlen(optionsJson) - 1);
-        strncat(optionsJson, "\"", sizeof(optionsJson) - strlen(optionsJson) - 1);
-        if (comma == nullptr) {
-            break;
-        }
-        cursor = comma + 1;
-        first = false;
+    doc["name"] = "Operation Mode";
+    doc["unique_id"] = "smartgarden_operation_mode";
+    doc["state_topic"] = MQTT_TOPIC_MODE_STATE;
+    doc["command_topic"] = MQTT_TOPIC_MODE_SET;
+    doc["icon"] = "mdi:cog";
+    JsonArray options = doc["options"].to<JsonArray>();
+    options.add("manual");
+    options.add("auto");
+    options.add("monitor");
+    addAvailability(doc);
+    addDeviceMetadata(doc);
+
+    snprintf(topic, sizeof(topic), "%s/select/smartgarden_operation_mode/config", HA_DISCOVERY_PREFIX);
+    publishDiscoveryMessage(topic, doc);
+}
+
+void publishCropSelectDiscovery() {
+    char topic[128];
+    StaticJsonDocument<1024> doc;
+    uint8_t cropCount = 0;
+    const CropProfile* crops = CropProfileStore::getAllCrops(cropCount);
+
+    doc["name"] = "Crop Profile";
+    doc["unique_id"] = "smartgarden_crop";
+    doc["state_topic"] = MQTT_TOPIC_CROP_CURRENT;
+    doc["command_topic"] = MQTT_TOPIC_CROP_SELECT;
+    doc["icon"] = "mdi:leaf";
+    JsonArray options = doc["options"].to<JsonArray>();
+    for (uint8_t i = 0; i < cropCount; ++i) {
+        options.add(crops[i].name);
     }
-    strncat(optionsJson, "]", sizeof(optionsJson) - strlen(optionsJson) - 1);
+    addAvailability(doc);
+    addDeviceMetadata(doc);
 
-    snprintf(topic, sizeof(topic), "%s/select/%s/config", HA_DISCOVERY_PREFIX, componentId);
-    snprintf(
-        payload,
-        sizeof(payload),
-        "{\"name\":\"%s\",\"unique_id\":\"%s\",\"state_topic\":\"%s\",\"command_topic\":\"%s\",\"availability_topic\":\"%s\",\"payload_available\":\"online\",\"payload_not_available\":\"offline\",\"icon\":\"%s\",\"options\":%s,\"device\":{\"identifiers\":[\"%s\"],\"name\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\"}}",
-        name,
-        componentId,
-        stateTopic,
-        commandTopic,
-        MQTT_TOPIC_AVAILABILITY,
-        icon,
-        optionsJson,
-        MQTT_DEVICE_ID,
-        MQTT_DEVICE_NAME,
-        MQTT_DEVICE_MANUFACTURER,
-        MQTT_DEVICE_MODEL);
-    publishDiscoveryMessage(topic, payload);
+    snprintf(topic, sizeof(topic), "%s/select/smartgarden_crop/config", HA_DISCOVERY_PREFIX);
+    publishDiscoveryMessage(topic, doc);
 }
 
 void publishDiscoveryMessages() {
@@ -372,18 +388,8 @@ void publishDiscoveryMessages() {
         publishRelayDiscovery(i);
     }
 
-    char cropOptions[512] = {0};
-    uint8_t cropCount = 0;
-    const CropProfile* crops = CropProfileStore::getAllCrops(cropCount);
-    for (uint8_t i = 0; i < cropCount; ++i) {
-        if (i > 0) {
-            strncat(cropOptions, ",", sizeof(cropOptions) - strlen(cropOptions) - 1);
-        }
-        strncat(cropOptions, crops[i].name, sizeof(cropOptions) - strlen(cropOptions) - 1);
-    }
-
-    publishSelectDiscovery("smartgarden_crop", "Crop Profile", MQTT_TOPIC_CROP_CURRENT, MQTT_TOPIC_CROP_SELECT, cropOptions, "mdi:leaf");
-    publishSelectDiscovery("smartgarden_operation_mode", "Operation Mode", MQTT_TOPIC_MODE_STATE, MQTT_TOPIC_MODE_SET, "manual,auto,monitor", "mdi:cog");
+    publishCropSelectDiscovery();
+    publishModeSelectDiscovery();
 
     Serial.println("[MQTT Discovery] All discovery messages published!\n");
 }
@@ -439,28 +445,30 @@ void ensureWiFiConnected() {
 }
 
 void reconnectMQTT() {
-    while (!mqttClient.connected()) {
-        Serial.printf("[MQTT] Connecting to %s:%d ... ", MQTT_BROKER, MQTT_PORT);
-        bool connected = mqttClient.connect(
-            mqttClientId,
-            MQTT_USERNAME,
-            MQTT_PASSWORD,
-            MQTT_TOPIC_AVAILABILITY,
-            1,
-            true,
-            "offline");
-
-        if (!connected) {
-            Serial.printf("FAILED (code=%d)\n", mqttClient.state());
-            delay(MQTT_RECONNECT_INTERVAL);
-            continue;
-        }
-
-        Serial.println("CONNECTED");
-        subscribeToTopics();
-        publishDiscoveryMessages();
-        publishAllState();
+    if (mqttClient.connected()) {
+        return;
     }
+
+    Serial.printf("[MQTT] Connecting to %s:%d ... ", MQTT_BROKER, MQTT_PORT);
+    bool connected = mqttClient.connect(
+        mqttClientId,
+        MQTT_USERNAME,
+        MQTT_PASSWORD,
+        MQTT_TOPIC_AVAILABILITY,
+        1,
+        true,
+        "offline");
+
+    lastMqttReconnectAttemptAt = millis();
+    if (!connected) {
+        Serial.printf("FAILED (code=%d)\n", mqttClient.state());
+        return;
+    }
+
+    Serial.println("CONNECTED");
+    subscribeToTopics();
+    publishDiscoveryMessages();
+    publishAllState();
 }
 
 bool readAirSensor() {
@@ -496,15 +504,15 @@ bool readSoilSensor() {
         return false;
     }
 
-    lastSoilState.moisture = node.getResponseBuffer(0) / 10.0f;
-    lastSoilState.temperature = node.getResponseBuffer(1) / 10.0f;
-    lastSoilState.ph = node.getResponseBuffer(3) / 10.0f;
-    lastSoilState.nitrogen = node.getResponseBuffer(4);
-    lastSoilState.phosphorus = node.getResponseBuffer(5);
-    lastSoilState.potassium = node.getResponseBuffer(6);
-    lastSoilState.ec = node.getResponseBuffer(9);
-    lastSoilState.salinity = node.getResponseBuffer(35) / 10.0f;
-    lastSoilState.tds = node.getResponseBuffer(36);
+    lastSoilState.moisture = node.getResponseBuffer(SOIL_MOISTURE_REGISTER) / 10.0f;
+    lastSoilState.temperature = node.getResponseBuffer(SOIL_TEMPERATURE_REGISTER) / 10.0f;
+    lastSoilState.ph = node.getResponseBuffer(SOIL_PH_REGISTER) / 10.0f;
+    lastSoilState.nitrogen = node.getResponseBuffer(SOIL_NITROGEN_REGISTER);
+    lastSoilState.phosphorus = node.getResponseBuffer(SOIL_PHOSPHORUS_REGISTER);
+    lastSoilState.potassium = node.getResponseBuffer(SOIL_POTASSIUM_REGISTER);
+    lastSoilState.ec = node.getResponseBuffer(SOIL_EC_REGISTER);
+    lastSoilState.salinity = node.getResponseBuffer(SOIL_SALINITY_REGISTER) / 10.0f;
+    lastSoilState.tds = node.getResponseBuffer(SOIL_TDS_REGISTER);
     lastSoilState.valid = true;
 
     Serial.printf(
@@ -687,7 +695,7 @@ void setup() {
     pinMode(RS485_DE, OUTPUT);
     digitalWrite(RS485_DE, LOW);
     RS485Serial.begin(RS485_BAUD_RATE, SERIAL_8N1, RS485_RX, RS485_TX);
-    node.begin(1, RS485Serial);
+    node.begin(RS485_SLAVE_ID, RS485Serial);
     node.preTransmission(preTransmission);
     node.postTransmission(postTransmission);
     Serial.printf("[Setup] RS485 initialized at %u baud\n", RS485_BAUD_RATE);
@@ -698,19 +706,24 @@ void setup() {
     mqttClient.setCallback(mqttCallback);
     mqttClient.setBufferSize(MQTT_BUFFER_SIZE);
 
+    if (WiFi.status() == WL_CONNECTED) {
+        reconnectMQTT();
+    }
+
     Serial.println("========== Setup Complete ==========");
 }
 
 void loop() {
     ensureWiFiConnected();
 
-    if (WiFi.status() == WL_CONNECTED && !mqttClient.connected()) {
+    const unsigned long now = millis();
+
+    if (WiFi.status() == WL_CONNECTED && !mqttClient.connected() &&
+        now - lastMqttReconnectAttemptAt >= MQTT_RECONNECT_INTERVAL) {
         reconnectMQTT();
     }
 
     mqttClient.loop();
-
-    const unsigned long now = millis();
     if (now - lastSensorReadAt >= SENSOR_READ_INTERVAL) {
         lastSensorReadAt = now;
 
@@ -719,7 +732,7 @@ void loop() {
 
         if (mqttClient.connected()) {
             publishAirStateIfValid();
-            if (soilReadOk) {
+            if (soilReadOk || lastSoilState.valid) {
                 publishSoilStateIfValid();
             }
         }

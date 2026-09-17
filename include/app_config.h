@@ -76,6 +76,7 @@
 #define SENSOR_READ_INTERVAL 5000
 #define DHT_READ_TIMEOUT 2000
 #define RS485_BAUD_RATE 4800
+#define RS485_SLAVE_ID 1
 #define RS485_READ_TIMEOUT 1000
 
 // ==================== CLIMATE CONTROL ====================
