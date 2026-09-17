@@ -4,12 +4,20 @@
 #include <stdint.h>
 #include <time.h>
 
+#if __has_include("secrets.h")
+#include "secrets.h"
+#endif
+
 #define APP_VERSION "1.0.0"
 #define APP_NAME "SmartGarden"
 #define DEBUG_MODE 1
 
+#ifndef WIFI_SSID
 #define WIFI_SSID "Le Danh"
+#endif
+#ifndef WIFI_PASSWORD
 #define WIFI_PASSWORD "123456789"
+#endif
 #define WIFI_TIMEOUT 20000
 
 // ==================== HOME ASSISTANT MQTT DISCOVERY ====================
@@ -20,11 +28,19 @@
 #define MQTT_DEVICE_ID "smartgarden_esp32"
 #define MQTT_DEVICE_NAME "Smart Garden"
 
+#ifndef MQTT_BROKER
 // Home Assistant MQTT Broker
 #define MQTT_BROKER "192.168.100.168"
+#endif
+#ifndef MQTT_PORT
 #define MQTT_PORT 1883
+#endif
+#ifndef MQTT_USERNAME
 #define MQTT_USERNAME "homer"
+#endif
+#ifndef MQTT_PASSWORD
 #define MQTT_PASSWORD "Danh@@@1992"
+#endif
 #define MQTT_RECONNECT_INTERVAL 5000
 #define MQTT_BUFFER_SIZE 512
 
@@ -69,6 +85,7 @@
 #define MQTT_TOPIC_MODE_SET MQTT_RUNTIME_PREFIX "/mode/set"
 #define MQTT_TOPIC_MODE_STATE MQTT_RUNTIME_PREFIX "/mode/state"
 #define MQTT_TOPIC_UPTIME MQTT_RUNTIME_PREFIX "/uptime"
+#define DEFAULT_CROP_ID 1
 
 // ==================== SENSOR CONFIGURATION ====================
 #define SENSOR_READ_INTERVAL 5000

@@ -41,6 +41,23 @@ static const CropProfile* currentCrop = nullptr;
 
 static unsigned long lastSensorRead = 0;
 
+static uint16_t modbusCRC16(const uint8_t* data, size_t length)
+{
+    uint16_t crc = 0xFFFF;
+    for (size_t i = 0; i < length; i++) {
+        crc ^= data[i];
+        for (uint8_t j = 0; j < 8; j++) {
+            if (crc & 0x0001) {
+                crc >>= 1;
+                crc ^= 0xA001;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+    return crc;
+}
+
 static const char* modeToString(OperationMode mode)
 {
     switch (mode) {
@@ -177,9 +194,25 @@ static void readRS485Sensors()
         return;
     }
 
-    uint8_t response[19];
+    uint8_t response[32];
     int bytesRead = Serial2.readBytes(response, sizeof(response));
-    if (bytesRead != static_cast<int>(sizeof(response))) {
+    if (bytesRead < 19) {
+        return;
+    }
+
+    if (response[0] != 0x01 || response[1] != 0x03) {
+        return;
+    }
+
+    uint8_t payloadBytes = response[2];
+    uint8_t expectedLength = payloadBytes + 5;
+    if (payloadBytes < 14 || expectedLength > bytesRead) {
+        return;
+    }
+
+    uint16_t receivedCrc = response[expectedLength - 2] | (response[expectedLength - 1] << 8);
+    uint16_t calculatedCrc = modbusCRC16(response, expectedLength - 2);
+    if (receivedCrc != calculatedCrc) {
         return;
     }
 
@@ -440,7 +473,10 @@ void setup()
     delay(1000);
 
     CropProfileStore::initialize();
-    currentCrop = CropProfileStore::getCropById(2);
+    currentCrop = CropProfileStore::getCropById(DEFAULT_CROP_ID);
+    if (!currentCrop) {
+        currentCrop = CropProfileStore::getCropById(1);
+    }
 
     for (uint8_t i = 0; i < NUM_RELAYS; i++) {
         pinMode(RELAY_PINS[i], OUTPUT);

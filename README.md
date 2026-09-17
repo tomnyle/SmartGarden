@@ -74,6 +74,15 @@ Cấu hình tập trung tại:
 - `include/pins.h` (toàn bộ pin)
 
 Khuyến nghị: chuyển credential thật sang `include/secrets.h` (file local, không commit).
+Ví dụ `include/secrets.h`:
+```cpp
+#define WIFI_SSID "your-ssid"
+#define WIFI_PASSWORD "your-pass"
+#define MQTT_BROKER "192.168.1.10"
+#define MQTT_PORT 1883
+#define MQTT_USERNAME "mqtt-user"
+#define MQTT_PASSWORD "mqtt-pass"
+```
 
 ## 7) Kiểm tra nhanh MQTT
 ```bash
