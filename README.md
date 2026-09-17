@@ -70,47 +70,48 @@ SmartGarden là một hệ thống IoT hoàn chỉnh cho phép quản lý **13 l
 - Không mất dữ liệu khi mất điện
 - Tự động load khi khởi động
 
-## 📡 MQTT Topics
+## 📡 MQTT Topics (chuẩn runtime + discovery)
 
 ```
-# Quản lý Cây
-smartgarden/crop/list              → Danh sách tất cả loại cây
-smartgarden/crop/set               → Chọn loại cây (Payload: "lettuce")
-smartgarden/crop/current           → Loại cây hiện tại
-smartgarden/crop/config            → Cấu hình loại cây hiện tại (JSON)
+# Discovery config (Home Assistant subscribe)
+homeassistant/sensor/.../config
+homeassistant/switch/.../config
+homeassistant/select/.../config
 
-# Dữ liệu Cảm Biến
-smartgarden/sensors/air_temp       → Nhiệt độ không khí (°C)
-smartgarden/sensors/air_humidity   → Độ ẩm không khí (%)
-smartgarden/sensors/soil_moisture  → Độ ẩm đất (%)
-smartgarden/sensors/soil_temp      → Nhiệt độ đất (°C)
-smartgarden/sensors/ph             → Giá trị pH
-smartgarden/sensors/ec             → Độ dẫn điện (uS/cm)
-smartgarden/sensors/nitrogen       → Nitrogen (mg/kg)
-smartgarden/sensors/phosphorus     → Phosphorus (mg/kg)
-smartgarden/sensors/potassium      → Potassium (mg/kg)
+# Runtime state/command (ESP32 publish/subscribe)
+smartgarden/status                  → online/offline (availability)
+smartgarden/diag/rssi               → RSSI Wi‑Fi (dBm)
+smartgarden/crop/list               → Danh sách crop
+smartgarden/crop/current            → Crop hiện tại
+smartgarden/crop/set                → Chọn crop từ HA
 
-# Relay & Điều Khiển
-smartgarden/relay/1/state          → Trạng thái relay 1
-smartgarden/relay/1/set            → Điều khiển relay 1
-smartgarden/autocontrol/state      → Trạng thái auto control
+smartgarden/sensors/air_temp
+smartgarden/sensors/air_humidity
+smartgarden/sensors/soil_moisture
+smartgarden/sensors/soil_temp
+smartgarden/sensors/ph
+smartgarden/sensors/ec
+smartgarden/sensors/nitrogen
+smartgarden/sensors/phosphorus
+smartgarden/sensors/potassium
 
-# Cảnh Báo
-smartgarden/alerts                 → Các cảnh báo thời gian thực
+smartgarden/relay/1/state ... smartgarden/relay/6/state
+smartgarden/relay/1/set   ... smartgarden/relay/6/set
 ```
 
 ## 🔧 Cấu Hình
 
 ### WiFi & MQTT
-Chỉnh sửa trong `include/config.h`:
+Chỉnh sửa trong `include/app_config.h`:
 ```cpp
-#define SMARTGARDEN_WIFI_SSID "YOUR_WIFI_SSID"
-#define SMARTGARDEN_WIFI_PASSWORD "YOUR_PASSWORD"
-#define SMARTGARDEN_MQTT_HOST "192.168.1.100"
-#define SMARTGARDEN_MQTT_PORT 1883
-#define SMARTGARDEN_MQTT_USERNAME "username"
-#define SMARTGARDEN_MQTT_PASSWORD "password"
+#define WIFI_SSID "YOUR_WIFI_SSID"
+#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define MQTT_BROKER "192.168.100.168"
+#define MQTT_PORT 1883
+#define MQTT_USERNAME "..."
+#define MQTT_PASSWORD "..."
 ```
+> Khuyến nghị: chuyển thông tin nhạy cảm sang `include/secrets.h` và thêm vào `.gitignore`.
 
 ### Chọn Loại Cây
 ```
@@ -171,18 +172,11 @@ mosquitto_sub -h 192.168.1.100 -t "smartgarden/crop/config"
 ## 🔌 Kế Nối Phần Cứng
 
 ### Cảm Biến
-- DHT22: Pin 15
-- RS485 (Modbus): RX=16, TX=17, DE/RE=4
+- DHT22: GPIO4
+- RS485 (Modbus): RX=16, TX=17, DE/RE=18
 
 ### Relay
-- Relay 0: Pin 5   (Bơm nước)
-- Relay 1: Pin 18  (Quạt)
-- Relay 2: Pin 19  (Đèn)
-- Relay 3: Pin 27  (Phân bón)
-- Relay 4: Pin 32
-- Relay 5: Pin 33
-- Relay 6: Pin 25
-- Relay 7: Pin 26
+- Relay 1..8: theo `include/pins.h` (`RELAY_PINS[]` là nguồn chuẩn)
 
 ## 📝 Cách Thêm Loại Cây Mới
 
@@ -217,3 +211,23 @@ Chào mừng các đóng góp! Vui lòng tạo Pull Request để thêm loại c
 **Phiên bản**: 1.0.0  
 **Cập nhật**: 2026-08-19  
 **Trạng thái**: ✅ Hoàn thành 13 loại cây
+
+## 🛠️ Build / Upload / Verify nhanh
+
+```bash
+pio run -e esp32dev
+pio run -e esp32dev -t upload
+pio device monitor -b 115200
+```
+
+Kiểm tra MQTT sau khi boot:
+```bash
+mosquitto_sub -h 192.168.100.168 -t 'homeassistant/+/+/config' -v
+mosquitto_sub -h 192.168.100.168 -t 'smartgarden/#' -v
+```
+
+Log mong đợi:
+- `[MQTT] Connected`
+- `[MQTT Discovery] ... published`
+- Sensor state xuất hiện dưới `smartgarden/sensors/...`
+- Relay command từ HA gửi về `smartgarden/relay/N/set`

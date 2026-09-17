@@ -12,14 +12,13 @@ void mqttMessageCallback(char* topic, byte* payload, unsigned int length) {
     }
 }
 
-static const char* SMARTGARDEN_DEVICE_INFO = R"({"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32 SmartGarden Controller","name":"Smart Garden"})";
-
 MQTTService::MQTTService(const char* broker, int port)
     : client(nullptr), mqttBroker(broker), mqttPort(port), connected(false),
       lastPublishTime(0), publishInterval(5000), lastDiscoveryTime(0),
       relayCallback(nullptr), cropCallback(nullptr)
 {
-    snprintf(deviceId, sizeof(deviceId), "SmartGarden_%llu", (unsigned long long)ESP.getEfuseMac());
+    strncpy(deviceId, MQTT_DEVICE_ID, sizeof(deviceId) - 1);
+    deviceId[sizeof(deviceId) - 1] = '\0';
     memset(mqttUsername, 0, sizeof(mqttUsername));
     memset(mqttPassword, 0, sizeof(mqttPassword));
     g_mqttService = this;
@@ -56,7 +55,7 @@ bool MQTTService::connect()
 
     Serial.printf("[MQTTService] Connecting to %s:%d...\n", mqttBroker, mqttPort);
 
-    if (client->connect(deviceId, mqttUsername, mqttPassword)) {
+    if (client->connect(deviceId, mqttUsername, mqttPassword, MQTT_TOPIC_STATUS, 1, true, "offline")) {
         Serial.println("[MQTTService] Connected to MQTT broker");
         connected = true;
         publishStatus("online");
@@ -186,21 +185,13 @@ bool MQTTService::publishCropList()
     String payload;
     serializeJson(doc, payload);
 
-    return client->publish(
-        (String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_crop/state").c_str(), 
-        payload.c_str(), 
-        true
-    );
+    return client->publish(MQTT_TOPIC_CROP_LIST, payload.c_str(), true);
 }
 
 bool MQTTService::publishCurrentCrop(const CropProfile* profile)
 {
     if (!client || !client->connected() || !profile) return false;
-    return client->publish(
-        (String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_crop/state").c_str(), 
-        profile->name, 
-        true
-    );
+    return client->publish(MQTT_TOPIC_CROP_SELECT_STATE, profile->name, true);
 }
 
 bool MQTTService::publishStatus(const char* status)
@@ -216,11 +207,7 @@ bool MQTTService::publishUptime(unsigned long uptime)
     if (!client || !client->connected()) return false;
     char payload[32];
     snprintf(payload, sizeof(payload), "%lu", uptime / 1000);
-    return client->publish(
-        (String(HA_DISCOVERY_PREFIX) + "/sensor/smartgarden_uptime/state").c_str(), 
-        payload, 
-        true
-    );
+    return client->publish(MQTT_BASE_TOPIC "/diag/uptime_sec", payload, true);
 }
 
 void MQTTService::subscribeToTopics()
@@ -236,7 +223,7 @@ void MQTTService::subscribeToTopics()
     client->subscribe(MQTT_TOPIC_CONTROL_IRRIGATION);
     
     // Subscribe to crop select topic
-    client->subscribe(MQTT_TOPIC_CROP_SELECT);
+    client->subscribe(MQTT_TOPIC_CROP_SELECT_COMMAND);
     
     Serial.println("[MQTT] Subscribed to all control topics");
 }
@@ -275,7 +262,7 @@ void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int len
     else if (topicStr == MQTT_TOPIC_CONTROL_HUMIDIFIER) handleRelayCommand(3, message);
     else if (topicStr == MQTT_TOPIC_CONTROL_DEHUMIDIFIER) handleRelayCommand(4, message);
     else if (topicStr == MQTT_TOPIC_CONTROL_IRRIGATION) handleRelayCommand(5, message);
-    else if (topicStr == MQTT_TOPIC_CROP_SELECT) handleCropSelect(message);
+    else if (topicStr == MQTT_TOPIC_CROP_SELECT_COMMAND) handleCropSelect(message);
 }
 
 void MQTTService::publishDiscoveryMessages()
@@ -471,7 +458,7 @@ void MQTTService::publishDiscoveryMessages()
         doc["name"] = "Crop Profile";
         doc["unique_id"] = "smartgarden_crop";
         doc["command_topic"] = MQTT_TOPIC_CROP_SELECT;
-        doc["state_topic"] = (String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_crop/state");
+        doc["state_topic"] = MQTT_TOPIC_CROP_SELECT_STATE;
         doc["icon"] = "mdi:leaf";
         JsonArray options = doc.createNestedArray("options");
         options.add("Tomato");

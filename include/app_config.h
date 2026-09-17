@@ -16,48 +16,67 @@
 #define HA_DISCOVERY_PREFIX "homeassistant"
 #define HA_DISCOVERY_ENABLED true
 
-// MQTT Device Configuration
-#define MQTT_DEVICE_ID "smartgarden_esp32"
-#define MQTT_DEVICE_NAME "Smart Garden"
-
 // Home Assistant MQTT Broker
 #define MQTT_BROKER "192.168.100.168"
 #define MQTT_PORT 1883
 #define MQTT_USERNAME "homer"
 #define MQTT_PASSWORD "Danh@@@1992"
 #define MQTT_RECONNECT_INTERVAL 5000
-#define MQTT_BUFFER_SIZE 512
+#define MQTT_BUFFER_SIZE 2048
 
-// ==================== MQTT TOPICS (Home Assistant Format) ====================
+#define MQTT_DEVICE_ID "smartgarden_esp32"
+#define MQTT_DEVICE_NAME "Smart Garden"
+#define MQTT_BASE_TOPIC "smartgarden"
+
+#define MQTT_TOPIC_STATUS MQTT_BASE_TOPIC "/status"
+#define MQTT_TOPIC_AVAILABILITY MQTT_BASE_TOPIC "/status"
+#define MQTT_TOPIC_CROP_SELECT_STATE MQTT_BASE_TOPIC "/crop/current"
+#define MQTT_TOPIC_CROP_SELECT_COMMAND MQTT_BASE_TOPIC "/crop/set"
+#define MQTT_TOPIC_CROP_LIST MQTT_BASE_TOPIC "/crop/list"
+#define MQTT_TOPIC_DIAG_RSSI MQTT_BASE_TOPIC "/diag/rssi"
+
+// ==================== MQTT TOPICS (Runtime smartgarden/...) ====================
 // Sensor Topics - State
-#define MQTT_TOPIC_AIR_TEMP HA_DISCOVERY_PREFIX "/sensor/smartgarden_air_temp/state"
-#define MQTT_TOPIC_AIR_HUMIDITY HA_DISCOVERY_PREFIX "/sensor/smartgarden_air_humidity/state"
-#define MQTT_TOPIC_SOIL_MOISTURE HA_DISCOVERY_PREFIX "/sensor/smartgarden_soil_moisture/state"
-#define MQTT_TOPIC_SOIL_TEMP HA_DISCOVERY_PREFIX "/sensor/smartgarden_soil_temp/state"
-#define MQTT_TOPIC_PH HA_DISCOVERY_PREFIX "/sensor/smartgarden_ph/state"
-#define MQTT_TOPIC_EC HA_DISCOVERY_PREFIX "/sensor/smartgarden_ec/state"
-#define MQTT_TOPIC_NITROGEN HA_DISCOVERY_PREFIX "/sensor/smartgarden_nitrogen/state"
-#define MQTT_TOPIC_PHOSPHORUS HA_DISCOVERY_PREFIX "/sensor/smartgarden_phosphorus/state"
-#define MQTT_TOPIC_POTASSIUM HA_DISCOVERY_PREFIX "/sensor/smartgarden_potassium/state"
+#define MQTT_TOPIC_AIR_TEMP MQTT_BASE_TOPIC "/sensors/air_temp"
+#define MQTT_TOPIC_AIR_HUMIDITY MQTT_BASE_TOPIC "/sensors/air_humidity"
+#define MQTT_TOPIC_SOIL_MOISTURE MQTT_BASE_TOPIC "/sensors/soil_moisture"
+#define MQTT_TOPIC_SOIL_TEMP MQTT_BASE_TOPIC "/sensors/soil_temp"
+#define MQTT_TOPIC_PH MQTT_BASE_TOPIC "/sensors/ph"
+#define MQTT_TOPIC_EC MQTT_BASE_TOPIC "/sensors/ec"
+#define MQTT_TOPIC_NITROGEN MQTT_BASE_TOPIC "/sensors/nitrogen"
+#define MQTT_TOPIC_PHOSPHORUS MQTT_BASE_TOPIC "/sensors/phosphorus"
+#define MQTT_TOPIC_POTASSIUM MQTT_BASE_TOPIC "/sensors/potassium"
 
 // Relay/Switch Topics - State & Command
-#define MQTT_TOPIC_FAN HA_DISCOVERY_PREFIX "/switch/smartgarden_fan/state"
-#define MQTT_TOPIC_HEATER HA_DISCOVERY_PREFIX "/switch/smartgarden_heater/state"
-#define MQTT_TOPIC_COOLER HA_DISCOVERY_PREFIX "/switch/smartgarden_cooler/state"
-#define MQTT_TOPIC_HUMIDIFIER HA_DISCOVERY_PREFIX "/switch/smartgarden_humidifier/state"
-#define MQTT_TOPIC_DEHUMIDIFIER HA_DISCOVERY_PREFIX "/switch/smartgarden_dehumidifier/state"
-#define MQTT_TOPIC_IRRIGATION HA_DISCOVERY_PREFIX "/switch/smartgarden_irrigation/state"
+#define MQTT_TOPIC_RELAY_1_STATE MQTT_BASE_TOPIC "/relay/1/state"
+#define MQTT_TOPIC_RELAY_2_STATE MQTT_BASE_TOPIC "/relay/2/state"
+#define MQTT_TOPIC_RELAY_3_STATE MQTT_BASE_TOPIC "/relay/3/state"
+#define MQTT_TOPIC_RELAY_4_STATE MQTT_BASE_TOPIC "/relay/4/state"
+#define MQTT_TOPIC_RELAY_5_STATE MQTT_BASE_TOPIC "/relay/5/state"
+#define MQTT_TOPIC_RELAY_6_STATE MQTT_BASE_TOPIC "/relay/6/state"
 
-#define MQTT_TOPIC_CONTROL_FAN HA_DISCOVERY_PREFIX "/switch/smartgarden_fan/command"
-#define MQTT_TOPIC_CONTROL_HEATER HA_DISCOVERY_PREFIX "/switch/smartgarden_heater/command"
-#define MQTT_TOPIC_CONTROL_COOLER HA_DISCOVERY_PREFIX "/switch/smartgarden_cooler/command"
-#define MQTT_TOPIC_CONTROL_HUMIDIFIER HA_DISCOVERY_PREFIX "/switch/smartgarden_humidifier/command"
-#define MQTT_TOPIC_CONTROL_DEHUMIDIFIER HA_DISCOVERY_PREFIX "/switch/smartgarden_dehumidifier/command"
-#define MQTT_TOPIC_CONTROL_IRRIGATION HA_DISCOVERY_PREFIX "/switch/smartgarden_irrigation/command"
+#define MQTT_TOPIC_RELAY_1_SET MQTT_BASE_TOPIC "/relay/1/set"
+#define MQTT_TOPIC_RELAY_2_SET MQTT_BASE_TOPIC "/relay/2/set"
+#define MQTT_TOPIC_RELAY_3_SET MQTT_BASE_TOPIC "/relay/3/set"
+#define MQTT_TOPIC_RELAY_4_SET MQTT_BASE_TOPIC "/relay/4/set"
+#define MQTT_TOPIC_RELAY_5_SET MQTT_BASE_TOPIC "/relay/5/set"
+#define MQTT_TOPIC_RELAY_6_SET MQTT_BASE_TOPIC "/relay/6/set"
 
-// Status & Crop Select
-#define MQTT_TOPIC_STATUS HA_DISCOVERY_PREFIX "/switch/smartgarden_status/state"
-#define MQTT_TOPIC_CROP_SELECT HA_DISCOVERY_PREFIX "/select/smartgarden_crop/command"
+// Backward-compatible aliases for service modules
+#define MQTT_TOPIC_FAN MQTT_TOPIC_RELAY_1_STATE
+#define MQTT_TOPIC_HEATER MQTT_TOPIC_RELAY_2_STATE
+#define MQTT_TOPIC_COOLER MQTT_TOPIC_RELAY_3_STATE
+#define MQTT_TOPIC_HUMIDIFIER MQTT_TOPIC_RELAY_4_STATE
+#define MQTT_TOPIC_DEHUMIDIFIER MQTT_TOPIC_RELAY_5_STATE
+#define MQTT_TOPIC_IRRIGATION MQTT_TOPIC_RELAY_6_STATE
+
+#define MQTT_TOPIC_CONTROL_FAN MQTT_TOPIC_RELAY_1_SET
+#define MQTT_TOPIC_CONTROL_HEATER MQTT_TOPIC_RELAY_2_SET
+#define MQTT_TOPIC_CONTROL_COOLER MQTT_TOPIC_RELAY_3_SET
+#define MQTT_TOPIC_CONTROL_HUMIDIFIER MQTT_TOPIC_RELAY_4_SET
+#define MQTT_TOPIC_CONTROL_DEHUMIDIFIER MQTT_TOPIC_RELAY_5_SET
+#define MQTT_TOPIC_CONTROL_IRRIGATION MQTT_TOPIC_RELAY_6_SET
+#define MQTT_TOPIC_CROP_SELECT MQTT_TOPIC_CROP_SELECT_COMMAND
 
 // ==================== SENSOR CONFIGURATION ====================
 #define SENSOR_READ_INTERVAL 5000
