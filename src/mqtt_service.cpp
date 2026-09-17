@@ -457,7 +457,7 @@ void MQTTService::publishDiscoveryMessages()
         StaticJsonDocument<512> doc;
         doc["name"] = "Crop Profile";
         doc["unique_id"] = "smartgarden_crop";
-        doc["command_topic"] = MQTT_TOPIC_CROP_SELECT;
+        doc["command_topic"] = MQTT_TOPIC_CROP_SELECT_COMMAND;
         doc["state_topic"] = MQTT_TOPIC_CROP_SELECT_STATE;
         doc["icon"] = "mdi:leaf";
         JsonArray options = doc.createNestedArray("options");

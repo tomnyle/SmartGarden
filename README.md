@@ -172,8 +172,8 @@ mosquitto_sub -h 192.168.1.100 -t "smartgarden/crop/config"
 ## 🔌 Kế Nối Phần Cứng
 
 ### Cảm Biến
-- DHT22: GPIO4
-- RS485 (Modbus): RX=16, TX=17, DE/RE=18
+- DHT22: `DHT_PIN = GPIO4`
+- RS485 (Modbus): `RS485_RX = GPIO16`, `RS485_TX = GPIO17`, `RS485_DE = GPIO18`
 
 ### Relay
 - Relay 1: GPIO32
