@@ -81,7 +81,7 @@ homeassistant/select/.../config
 # Runtime state/command (ESP32 publish/subscribe)
 smartgarden/status                  → online/offline (availability)
 smartgarden/diag/rssi               → RSSI Wi‑Fi (dBm)
-smartgarden/crop/list               → Danh sách crop
+smartgarden/crop/list               → Danh sách crop (JSON: `{"options":[...]}`)
 smartgarden/crop/current            → Crop hiện tại
 smartgarden/crop/set                → Chọn crop từ HA
 

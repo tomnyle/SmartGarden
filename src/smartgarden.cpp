@@ -23,6 +23,7 @@ static unsigned long lastMqttReconnectAttempt = 0;
 static unsigned long mqttBackoffMs = 2000;
 static const unsigned long MQTT_BACKOFF_MAX_MS = 60000;
 static String currentCrop = "lettuce";
+static const char* CROP_OPTIONS_JSON = "{\"options\":[\"ginseng\",\"salvia\",\"morinda\",\"lettuce\",\"microgreens\",\"tomato\",\"strawberry\",\"cucumber\",\"chili\",\"eggplant\",\"carrot\",\"onion\",\"broccoli\"]}";
 
 static unsigned long lastSensorRead = 0;
 
@@ -74,7 +75,10 @@ void setRelay(int index, bool state) {
 
     const char* stateTopic = relayStateTopicByIndex(index);
     if (stateTopic) {
-        client.publish(stateTopic, state ? "ON" : "OFF", true);
+        bool ok = client.publish(stateTopic, state ? "ON" : "OFF", true);
+        if (!ok) {
+            Serial.printf("[MQTT] Relay state publish failed: %s\n", stateTopic);
+        }
     }
 
     Serial.printf("[Relay] Relay %d (%s) -> %s\n", index + 1, relayNames[index], state ? "ON" : "OFF");
@@ -190,7 +194,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
         if (msg.length() > 0) {
             currentCrop = msg;
         }
-        client.publish(MQTT_TOPIC_CROP_SELECT_STATE, msg.c_str(), true);
+        bool cropStateOk = client.publish(MQTT_TOPIC_CROP_SELECT_STATE, msg.c_str(), true);
+        if (!cropStateOk) {
+            Serial.printf("[MQTT] Crop state publish failed: %s\n", MQTT_TOPIC_CROP_SELECT_STATE);
+        }
     }
 }
 
@@ -224,7 +231,7 @@ static void ensureMqttConnected() {
 
         bool setupOk = true;
         setupOk &= client.publish(MQTT_TOPIC_STATUS, "online", true);
-        setupOk &= client.publish(MQTT_TOPIC_CROP_LIST, "ginseng,salvia,morinda,lettuce,microgreens,tomato,strawberry,cucumber,chili,eggplant,carrot,onion,broccoli", true);
+        setupOk &= client.publish(MQTT_TOPIC_CROP_LIST, CROP_OPTIONS_JSON, true);
         setupOk &= client.publish(MQTT_TOPIC_CROP_SELECT_STATE, currentCrop.c_str(), true);
         setupOk &= client.publish(MQTT_TOPIC_DIAG_RSSI, String(WiFi.RSSI()).c_str(), true);
 
