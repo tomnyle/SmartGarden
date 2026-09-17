@@ -3,6 +3,7 @@
 ## A. Build
 - [ ] `pio run -e esp32dev` thành công.
 - [ ] Không còn lỗi linker kiểu multiple definition MQTTService.
+- [ ] Repository hiện chưa có test harness/unit test firmware tự động trong `test/`; khi bổ sung cần thêm test parser topic MQTT và chuyển mode manual/auto/monitor.
 
 ## B. Wi-Fi và MQTT
 - [ ] ESP32 vào Wi-Fi đúng SSID.

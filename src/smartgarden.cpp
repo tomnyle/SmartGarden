@@ -233,18 +233,26 @@ static void readRS485Sensors()
     int16_t rawSoilTemp = static_cast<int16_t>((response[5] << 8) | response[6]);
     float parsedSoilTemp = rawSoilTemp / 10.0f;
     float parsedPh = (response[7] << 8 | response[8]) / 10.0f;
+    uint16_t parsedEc = (response[9] << 8 | response[10]);
+    uint16_t parsedNitrogen = (response[11] << 8 | response[12]);
+    uint16_t parsedPhosphorus = (response[13] << 8 | response[14]);
+    uint16_t parsedPotassium = (response[15] << 8 | response[16]);
 
-    if (parsedSoilMoisture < 0.0f || parsedSoilMoisture > 100.0f || parsedPh < 0.0f || parsedPh > 14.0f) {
+    if (parsedSoilMoisture < 0.0f || parsedSoilMoisture > 100.0f ||
+        parsedSoilTemp < -40.0f || parsedSoilTemp > 85.0f ||
+        parsedPh < 0.0f || parsedPh > 14.0f ||
+        parsedEc > 20000 || parsedNitrogen > 5000 ||
+        parsedPhosphorus > 5000 || parsedPotassium > 5000) {
         return;
     }
 
     soilMoisture = parsedSoilMoisture;
     soilTemp = parsedSoilTemp;
     ph = parsedPh;
-    ec = (response[9] << 8 | response[10]);
-    nitrogen = (response[11] << 8 | response[12]);
-    phosphorus = (response[13] << 8 | response[14]);
-    potassium = (response[15] << 8 | response[16]);
+    ec = parsedEc;
+    nitrogen = parsedNitrogen;
+    phosphorus = parsedPhosphorus;
+    potassium = parsedPotassium;
 
     rs485DataValid = true;
 }
@@ -424,9 +432,12 @@ static void handleCropSelect(const char* payload)
 
 static void setMode(OperationMode mode)
 {
+    OperationMode previousMode = currentMode;
     currentMode = mode;
 
     if (currentMode == MODE_MONITOR) {
+        setAllRelays(false);
+    } else if (currentMode == MODE_MANUAL && previousMode != MODE_MANUAL) {
         setAllRelays(false);
     }
 
