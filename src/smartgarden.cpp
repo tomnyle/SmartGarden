@@ -276,7 +276,7 @@ static void applyAutoControl()
 
     if (soilMoisture < currentCrop->soilHumidity.min) {
         setRelay(IRRIGATION_RELAY_INDEX, true);
-    } else if (soilMoisture > currentCrop->soilHumidity.max) {
+    } else {
         setRelay(IRRIGATION_RELAY_INDEX, false);
     }
 }
@@ -447,7 +447,7 @@ static void setMode(OperationMode mode)
 
 static void callback(char* topic, byte* payload, unsigned int length)
 {
-    char message[128];
+    char message[MQTT_BUFFER_SIZE];
     if (length >= sizeof(message)) {
         Serial.println("[MQTT] Command payload too long, ignored");
         return;
