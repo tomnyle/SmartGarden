@@ -13,10 +13,10 @@
 #define DEBUG_MODE 1
 
 #ifndef WIFI_SSID
-#define WIFI_SSID "Le Danh"
+#define WIFI_SSID "YOUR_WIFI_SSID"
 #endif
 #ifndef WIFI_PASSWORD
-#define WIFI_PASSWORD "123456789"
+#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
 #endif
 #define WIFI_TIMEOUT 20000
 
@@ -30,16 +30,16 @@
 
 #ifndef MQTT_BROKER
 // Home Assistant MQTT Broker
-#define MQTT_BROKER "192.168.100.168"
+#define MQTT_BROKER "192.168.1.100"
 #endif
 #ifndef MQTT_PORT
 #define MQTT_PORT 1883
 #endif
 #ifndef MQTT_USERNAME
-#define MQTT_USERNAME "homer"
+#define MQTT_USERNAME "YOUR_MQTT_USERNAME"
 #endif
 #ifndef MQTT_PASSWORD
-#define MQTT_PASSWORD "Danh@@@1992"
+#define MQTT_PASSWORD "YOUR_MQTT_PASSWORD"
 #endif
 #define MQTT_RECONNECT_INTERVAL 5000
 #define MQTT_BUFFER_SIZE 512

@@ -327,6 +327,7 @@ static void publishDiscoveryMessages()
         doc["state_topic"] = sensor.stateTopic;
         doc["unit_of_measurement"] = sensor.unit;
         doc["icon"] = sensor.icon;
+        doc["state_class"] = "measurement";
         if (sensor.deviceClass) {
             doc["device_class"] = sensor.deviceClass;
         }
@@ -446,9 +447,10 @@ static void setMode(OperationMode mode)
 
 static void callback(char* topic, byte* payload, unsigned int length)
 {
-    char message[64];
+    char message[128];
     if (length >= sizeof(message)) {
-        length = sizeof(message) - 1;
+        Serial.println("[MQTT] Command payload too long, ignored");
+        return;
     }
     memcpy(message, payload, length);
     message[length] = '\0';

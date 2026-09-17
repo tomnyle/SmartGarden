@@ -18,6 +18,10 @@ SmartGarden sẽ publish config vào:
 - Switch: 8 relay.
 - Select: `Crop Profile` và `Operation Mode`.
 
+Lưu ý quan trọng về relay switch:
+- Ở `manual`: switch relay nhận lệnh bình thường.
+- Ở `auto` và `monitor`: switch vẫn hiển thị để giám sát trạng thái, nhưng lệnh relay thủ công sẽ bị firmware bỏ qua có chủ đích.
+
 Mỗi entity có:
 - `availability_topic = smartgarden/availability`
 - `payload_available = online`
