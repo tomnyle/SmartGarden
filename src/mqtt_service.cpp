@@ -461,10 +461,12 @@ void MQTTService::publishDiscoveryMessages()
         doc["state_topic"] = MQTT_TOPIC_CROP_SELECT_STATE;
         doc["icon"] = "mdi:leaf";
         JsonArray options = doc.createNestedArray("options");
-        options.add("Tomato");
-        options.add("Lettuce");
-        options.add("Pepper");
-        options.add("Cucumber");
+        CropProfileStore::initialize();
+        uint8_t count = 0;
+        const CropProfile* crops = CropProfileStore::getAllCrops(count);
+        for (uint8_t i = 0; i < count; i++) {
+            options.add(crops[i].name);
+        }
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
         

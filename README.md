@@ -186,6 +186,7 @@ mosquitto_sub -h 192.168.1.100 -t "smartgarden/crop/config"
 - Relay 8: GPIO13
   
 `include/pins.h` (`RELAY_PINS[]`) là nguồn chuẩn cho firmware.
+Nếu có khác biệt thực tế, ưu tiên cập nhật `include/pins.h` rồi build lại.
 
 ## 📝 Cách Thêm Loại Cây Mới
 
