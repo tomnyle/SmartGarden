@@ -187,7 +187,7 @@ bool MQTTService::publishCropList()
     serializeJson(doc, payload);
 
     return client->publish(
-        (String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_crop/state").c_str(), 
+        MQTT_TOPIC_CROP_LIST, 
         payload.c_str(), 
         true
     );
@@ -197,7 +197,7 @@ bool MQTTService::publishCurrentCrop(const CropProfile* profile)
 {
     if (!client || !client->connected() || !profile) return false;
     return client->publish(
-        (String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_crop/state").c_str(), 
+        MQTT_TOPIC_CROP_CURRENT, 
         profile->name, 
         true
     );
@@ -217,7 +217,7 @@ bool MQTTService::publishUptime(unsigned long uptime)
     char payload[32];
     snprintf(payload, sizeof(payload), "%lu", uptime / 1000);
     return client->publish(
-        (String(HA_DISCOVERY_PREFIX) + "/sensor/smartgarden_uptime/state").c_str(), 
+        MQTT_TOPIC_UPTIME, 
         payload, 
         true
     );
@@ -471,7 +471,7 @@ void MQTTService::publishDiscoveryMessages()
         doc["name"] = "Crop Profile";
         doc["unique_id"] = "smartgarden_crop";
         doc["command_topic"] = MQTT_TOPIC_CROP_SELECT;
-        doc["state_topic"] = (String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_crop/state");
+        doc["state_topic"] = MQTT_TOPIC_CROP_CURRENT;
         doc["icon"] = "mdi:leaf";
         JsonArray options = doc.createNestedArray("options");
         options.add("Tomato");
