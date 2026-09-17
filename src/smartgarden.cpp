@@ -244,10 +244,17 @@ void publishSystemState() {
 
 void publishDiscoveryMessage(const char* topic, JsonDocument& doc) {
     char payload[1024];
-    serializeJson(doc, payload, sizeof(payload));
-    mqttClient.publish(topic, payload, true);
+    size_t payloadLength = serializeJson(doc, payload, sizeof(payload));
+    bool truncated = payloadLength >= sizeof(payload) - 1;
+    bool published = !truncated && mqttClient.publish(topic, payload, true);
+
+    if (published) {
+        Serial.printf("[HA Discovery] %s => OK\n", topic);
+    } else {
+        Serial.printf("[HA Discovery] %s => FAIL%s\n", topic, truncated ? " (payload truncated)" : "");
+    }
+
     delay(25);
-    Serial.printf("[HA Discovery] %s => OK\n", topic);
 }
 
 void addAvailability(JsonDocument& doc) {
@@ -514,12 +521,12 @@ bool readSoilSensor() {
         lastSoilState.moisture,
         lastSoilState.temperature,
         lastSoilState.ph,
-        lastSoilState.ec,
-        lastSoilState.nitrogen,
-        lastSoilState.phosphorus,
-        lastSoilState.potassium,
+        static_cast<unsigned int>(lastSoilState.ec),
+        static_cast<unsigned int>(lastSoilState.nitrogen),
+        static_cast<unsigned int>(lastSoilState.phosphorus),
+        static_cast<unsigned int>(lastSoilState.potassium),
         lastSoilState.salinity,
-        lastSoilState.tds);
+        static_cast<unsigned int>(lastSoilState.tds));
     return true;
 }
 
@@ -537,12 +544,12 @@ void printSensorSummary() {
         Serial.printf("Soil Moisture: %.1f %%\n", lastSoilState.moisture);
         Serial.printf("Soil Temp    : %.1f C\n", lastSoilState.temperature);
         Serial.printf("pH           : %.1f\n", lastSoilState.ph);
-        Serial.printf("EC           : %u uS/cm\n", lastSoilState.ec);
-        Serial.printf("Nitrogen     : %u mg/kg\n", lastSoilState.nitrogen);
-        Serial.printf("Phosphorus   : %u mg/kg\n", lastSoilState.phosphorus);
-        Serial.printf("Potassium    : %u mg/kg\n", lastSoilState.potassium);
+        Serial.printf("EC           : %u uS/cm\n", static_cast<unsigned int>(lastSoilState.ec));
+        Serial.printf("Nitrogen     : %u mg/kg\n", static_cast<unsigned int>(lastSoilState.nitrogen));
+        Serial.printf("Phosphorus   : %u mg/kg\n", static_cast<unsigned int>(lastSoilState.phosphorus));
+        Serial.printf("Potassium    : %u mg/kg\n", static_cast<unsigned int>(lastSoilState.potassium));
         Serial.printf("Salinity     : %.1f ppt\n", lastSoilState.salinity);
-        Serial.printf("TDS          : %u ppm\n", lastSoilState.tds);
+        Serial.printf("TDS          : %u ppm\n", static_cast<unsigned int>(lastSoilState.tds));
     } else {
         Serial.println("Soil Moisture: unavailable");
         Serial.println("Soil Temp    : unavailable");
