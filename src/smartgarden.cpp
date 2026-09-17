@@ -22,6 +22,7 @@ static unsigned long lastWifiReconnectAttempt = 0;
 static unsigned long lastMqttReconnectAttempt = 0;
 static unsigned long mqttBackoffMs = 2000;
 static const unsigned long MQTT_BACKOFF_MAX_MS = 60000;
+static String currentCrop = "lettuce";
 
 static unsigned long lastSensorRead = 0;
 
@@ -182,6 +183,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
     if (String(topic) == MQTT_TOPIC_CROP_SELECT_COMMAND) {
+        if (msg.length() > 0) {
+            currentCrop = msg;
+        }
         client.publish(MQTT_TOPIC_CROP_SELECT_STATE, msg.c_str(), true);
     }
 }
@@ -216,7 +220,7 @@ static void ensureMqttConnected() {
 
         client.publish(MQTT_TOPIC_STATUS, "online", true);
         client.publish(MQTT_TOPIC_CROP_LIST, "ginseng,salvia,morinda,lettuce,microgreens,tomato,strawberry,cucumber,chili,eggplant,carrot,onion,broccoli", true);
-        client.publish(MQTT_TOPIC_CROP_SELECT_STATE, "lettuce", true);
+        client.publish(MQTT_TOPIC_CROP_SELECT_STATE, currentCrop.c_str(), true);
         client.publish(MQTT_TOPIC_DIAG_RSSI, String(WiFi.RSSI()).c_str(), true);
 
         for (int i = 0; i < RELAY_COUNT; i++) {

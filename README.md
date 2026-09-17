@@ -171,21 +171,17 @@ mosquitto_sub -h 192.168.1.100 -t "smartgarden/crop/config"
 
 ## 🔌 Kế Nối Phần Cứng
 
-### Cảm Biến
-- DHT22: `DHT_PIN = GPIO4`
-- RS485 (Modbus): `RS485_RX = GPIO16`, `RS485_TX = GPIO17`, `RS485_DE = GPIO18`
+Giá trị mặc định lấy trực tiếp từ `include/pins.h`:
 
-### Relay
-- Relay 1: GPIO32
-- Relay 2: GPIO33
-- Relay 3: GPIO25
-- Relay 4: GPIO26
-- Relay 5: GPIO27
-- Relay 6: GPIO14
-- Relay 7: GPIO12
-- Relay 8: GPIO13
-  
-`include/pins.h` (`RELAY_PINS[]`) là nguồn chuẩn cho firmware.
+```cpp
+#define DHT_PIN 4
+#define RS485_RX 16
+#define RS485_TX 17
+#define RS485_DE 18
+const uint8_t RELAY_PINS[8] = {32, 33, 25, 26, 27, 14, 12, 13};
+```
+
+Firmware luôn dùng `DHT_PIN`, `RS485_RX/TX/DE` và `RELAY_PINS[]` từ file này.
 Nếu có khác biệt thực tế, ưu tiên cập nhật `include/pins.h` rồi build lại.
 
 ## 📝 Cách Thêm Loại Cây Mới
