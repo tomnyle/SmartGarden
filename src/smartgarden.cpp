@@ -245,17 +245,11 @@ void publishSystemState() {
 }
 
 void publishDiscoveryMessage(const char* topic, JsonDocument& doc) {
-    char payload[1024];
-    size_t payloadLength = serializeJson(doc, payload, sizeof(payload));
-    bool truncated = payloadLength >= sizeof(payload) - 1;
-    bool published = !truncated && mqttClient.publish(topic, payload, true);
+    String payload;
+    serializeJson(doc, payload);
+    bool published = mqttClient.publish(topic, payload.c_str(), true);
 
-    if (published) {
-        Serial.printf("[HA Discovery] %s => OK\n", topic);
-    } else {
-        Serial.printf("[HA Discovery] %s => FAIL%s\n", topic, truncated ? " (payload truncated)" : "");
-    }
-
+    Serial.printf("[HA Discovery] %s => %s\n", topic, published ? "OK" : "FAIL");
     delay(25);
 }
 
@@ -568,7 +562,7 @@ void printSensorSummary() {
     Serial.println("=================================");
 }
 
-void applyAutoControl(bool hasFreshSoilData) {
+void applyAutoControl() {
     if (currentMode != OperationMode::AUTO || currentCrop == nullptr) {
         return;
     }
@@ -589,7 +583,7 @@ void applyAutoControl(bool hasFreshSoilData) {
         setRelay(CLIMATE_DEHUMIDIFIER_RELAY_INDEX, dehumidifierOn);
     }
 
-    if (hasFreshSoilData && lastSoilState.valid) {
+    if (lastSoilState.valid) {
         bool irrigationOn = lastSoilState.moisture < currentCrop->soilHumidity.min;
         setRelay(IRRIGATION_RELAY_INDEX, irrigationOn);
     }
@@ -622,7 +616,7 @@ void handleModeSelection(const char* payload) {
     if (currentMode == OperationMode::MONITOR) {
         setAllRelaysOff();
     } else if (currentMode == OperationMode::AUTO) {
-        applyAutoControl(false);
+        applyAutoControl();
     }
 
     if (mqttClient.connected()) {
@@ -745,7 +739,7 @@ void loop() {
             }
         }
 
-        applyAutoControl(soilReadOk);
+        applyAutoControl();
         printSensorSummary();
     }
 
