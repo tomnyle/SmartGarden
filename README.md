@@ -171,18 +171,12 @@ mosquitto_sub -h 192.168.1.100 -t "smartgarden/crop/config"
 
 ## 🔌 Kế Nối Phần Cứng
 
-Giá trị dưới đây khớp trực tiếp với `include/pins.h` hiện tại:
+Nguồn cấu hình chân duy nhất: `include/pins.h`
+- DHT: `DHT_PIN`
+- RS485: `RS485_RX`, `RS485_TX`, `RS485_DE`
+- Relay: `RELAY_PINS[]`
 
-```cpp
-#define DHT_PIN 4
-#define RS485_RX 16
-#define RS485_TX 17
-#define RS485_DE 18
-const uint8_t RELAY_PINS[8] = {32, 33, 25, 26, 27, 14, 12, 13};
-```
-
-Firmware luôn dùng `DHT_PIN`, `RS485_RX/TX/DE` và `RELAY_PINS[]` từ file này.
-Nếu có khác biệt thực tế, ưu tiên cập nhật `include/pins.h` rồi build lại.
+Firmware luôn đọc chân từ file này. Nếu cần đổi mapping, chỉ sửa `include/pins.h` rồi build lại.
 
 ## 📝 Cách Thêm Loại Cây Mới
 

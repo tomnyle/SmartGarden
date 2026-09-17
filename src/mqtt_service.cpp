@@ -175,16 +175,11 @@ bool MQTTService::publishCropList()
     uint8_t count = 0;
     const CropProfile* crops = CropProfileStore::getAllCrops(count);
 
-    StaticJsonDocument<1024> doc;
-    JsonArray options = doc.createNestedArray("options");
-    
-    for (uint8_t i = 0; i < count; i++) {
-        options.add(crops[i].name);
-    }
-
     String payload;
-    serializeJson(doc, payload);
-
+    for (uint8_t i = 0; i < count; i++) {
+        if (i > 0) payload += ",";
+        payload += crops[i].name;
+    }
     return client->publish(MQTT_TOPIC_CROP_LIST, payload.c_str(), true);
 }
 
