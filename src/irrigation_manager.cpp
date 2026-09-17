@@ -2,8 +2,8 @@
 #include <Arduino.h>
 
 IrrigationManager::IrrigationManager()
-    : active(false), startTime(0), maxDuration(3600000), // 1 hour max by default
-      relayManager(nullptr), relayIndex(IRRIGATION_RELAY_INDEX)
+    : relayManager(nullptr), active(false), startTime(0),
+      maxDuration(3600000), relayIndex(IRRIGATION_RELAY_INDEX) // 1 hour max by default
 {
 }
 

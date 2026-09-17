@@ -5,15 +5,15 @@
 // Default configuration
 static SystemConfig DEFAULT_CONFIG = {
     "SmartGarden",           // deviceName
-    "Le Danh",               // wifiSSID
-    "123456789",             // wifiPassword
-    "192.168.100.166",       // mqttBroker
-    1883,                    // mqttPort
-    "homer",                 // mqttUsername
-    "Danh@@@1992",           // mqttPassword
-    5000,                    // sensorReadInterval
-    10000,                   // climateControlInterval
-    5000                     // publishInterval
+    WIFI_SSID,               // wifiSSID
+    WIFI_PASSWORD,           // wifiPassword
+    MQTT_BROKER,             // mqttBroker
+    MQTT_PORT,               // mqttPort
+    MQTT_USERNAME,           // mqttUsername
+    MQTT_PASSWORD,           // mqttPassword
+    SENSOR_READ_INTERVAL,    // sensorReadInterval
+    CLIMATE_CONTROL_INTERVAL,// climateControlInterval
+    PUBLISH_SENSOR_INTERVAL  // publishInterval
 };
 
 #define CONFIG_EEPROM_ADDR 0

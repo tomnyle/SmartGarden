@@ -12,12 +12,10 @@ void mqttMessageCallback(char* topic, byte* payload, unsigned int length) {
     }
 }
 
-static const char* SMARTGARDEN_DEVICE_INFO = R"({"identifiers":["smartgarden_esp32"],"manufacturer":"DIY","model":"ESP32 SmartGarden Controller","name":"Smart Garden"})";
-
 MQTTService::MQTTService(const char* broker, int port)
     : client(nullptr), mqttBroker(broker), mqttPort(port), connected(false),
       lastPublishTime(0), publishInterval(5000), lastDiscoveryTime(0),
-      relayCallback(nullptr), cropCallback(nullptr)
+      relayCallback(nullptr), cropCallback(nullptr), modeCallback(nullptr)
 {
     snprintf(deviceId, sizeof(deviceId), "SmartGarden_%llu", (unsigned long long)ESP.getEfuseMac());
     memset(mqttUsername, 0, sizeof(mqttUsername));
@@ -48,6 +46,7 @@ void MQTTService::begin(const char* username, const char* password)
 
 void MQTTService::setRelayCommandCallback(RelayCommandCallback callback) { relayCallback = callback; }
 void MQTTService::setCropSelectCallback(CropSelectCallback callback) { cropCallback = callback; }
+void MQTTService::setModeSelectCallback(ModeSelectCallback callback) { modeCallback = callback; }
 
 bool MQTTService::connect()
 {
@@ -56,9 +55,10 @@ bool MQTTService::connect()
 
     Serial.printf("[MQTTService] Connecting to %s:%d...\n", mqttBroker, mqttPort);
 
-    if (client->connect(deviceId, mqttUsername, mqttPassword)) {
+    if (client->connect(deviceId, mqttUsername, mqttPassword, MQTT_TOPIC_AVAILABILITY, 0, true, "offline")) {
         Serial.println("[MQTTService] Connected to MQTT broker");
         connected = true;
+        client->publish(MQTT_TOPIC_AVAILABILITY, "online", true);
         publishStatus("online");
         subscribeToTopics();
         publishDiscoveryMessages();
@@ -138,23 +138,15 @@ bool MQTTService::publishSensorData(const SensorSnapshot& snapshot)
 bool MQTTService::publishRelayStatus(uint8_t relayIndex, bool state)
 {
     if (!client || !client->connected()) return false;
-    
-    const char* relayTopics[] = {
-        MQTT_TOPIC_FAN,
-        MQTT_TOPIC_HEATER,
-        MQTT_TOPIC_COOLER,
-        MQTT_TOPIC_HUMIDIFIER,
-        MQTT_TOPIC_DEHUMIDIFIER,
-        MQTT_TOPIC_IRRIGATION
-    };
-    
-    const char* relayNames[] = {"Fan", "Heater", "Cooler", "Humidifier", "Dehumidifier", "Irrigation"};
-    
-    if (relayIndex >= 6) return false;
-    
-    bool success = client->publish(relayTopics[relayIndex], state ? "ON" : "OFF", true);
+
+    if (relayIndex >= NUM_RELAYS) return false;
+
+    char relayTopic[64];
+    snprintf(relayTopic, sizeof(relayTopic), MQTT_RUNTIME_PREFIX "/relay/%u/state", relayIndex + 1);
+
+    bool success = client->publish(relayTopic, state ? "ON" : "OFF", true);
     if (success) {
-        Serial.printf("[MQTT] %s: %s\n", relayNames[relayIndex], state ? "ON" : "OFF");
+        Serial.printf("[MQTT] Relay %u: %s\n", relayIndex + 1, state ? "ON" : "OFF");
     }
     return success;
 }
@@ -162,7 +154,7 @@ bool MQTTService::publishRelayStatus(uint8_t relayIndex, bool state)
 bool MQTTService::publishAllRelayStatus(const RelayManager* relayMgr)
 {
     if (!relayMgr) return false;
-    for (uint8_t i = 0; i < 6; i++) {
+    for (uint8_t i = 0; i < NUM_RELAYS; i++) {
         publishRelayStatus(i, relayMgr->getRelayState(i));
     }
     return true;
@@ -187,7 +179,7 @@ bool MQTTService::publishCropList()
     serializeJson(doc, payload);
 
     return client->publish(
-        (String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_crop/state").c_str(), 
+        MQTT_TOPIC_CROP_LIST,
         payload.c_str(), 
         true
     );
@@ -197,7 +189,7 @@ bool MQTTService::publishCurrentCrop(const CropProfile* profile)
 {
     if (!client || !client->connected() || !profile) return false;
     return client->publish(
-        (String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_crop/state").c_str(), 
+        MQTT_TOPIC_CROP_STATE,
         profile->name, 
         true
     );
@@ -216,37 +208,31 @@ bool MQTTService::publishUptime(unsigned long uptime)
     if (!client || !client->connected()) return false;
     char payload[32];
     snprintf(payload, sizeof(payload), "%lu", uptime / 1000);
-    return client->publish(
-        (String(HA_DISCOVERY_PREFIX) + "/sensor/smartgarden_uptime/state").c_str(), 
-        payload, 
-        true
-    );
+    return client->publish(MQTT_TOPIC_UPTIME, payload, true);
 }
 
 void MQTTService::subscribeToTopics()
 {
     if (!client) return;
-    
-    // Subscribe to relay control topics
-    client->subscribe(MQTT_TOPIC_CONTROL_FAN);
-    client->subscribe(MQTT_TOPIC_CONTROL_HEATER);
-    client->subscribe(MQTT_TOPIC_CONTROL_COOLER);
-    client->subscribe(MQTT_TOPIC_CONTROL_HUMIDIFIER);
-    client->subscribe(MQTT_TOPIC_CONTROL_DEHUMIDIFIER);
-    client->subscribe(MQTT_TOPIC_CONTROL_IRRIGATION);
-    
+
+    for (uint8_t i = 1; i <= NUM_RELAYS; i++) {
+        char topic[64];
+        snprintf(topic, sizeof(topic), MQTT_RUNTIME_PREFIX "/relay/%u/set", i);
+        client->subscribe(topic);
+    }
+
     // Subscribe to crop select topic
     client->subscribe(MQTT_TOPIC_CROP_SELECT);
+    client->subscribe(MQTT_TOPIC_MODE_SET);
     
     Serial.println("[MQTT] Subscribed to all control topics");
 }
 
 void MQTTService::handleRelayCommand(uint8_t relayIndex, const char* payload)
 {
-    const char* relayNames[] = {"Fan", "Heater", "Cooler", "Humidifier", "Dehumidifier", "Irrigation"};
     bool state = (strcmp(payload, "ON") == 0 || strcmp(payload, "1") == 0);
-    
-    Serial.printf("[MQTT] Command received: %s = %s\n", relayNames[relayIndex], state ? "ON" : "OFF");
+
+    Serial.printf("[MQTT] Command received: relay %u = %s\n", relayIndex + 1, state ? "ON" : "OFF");
     
     if (relayCallback) relayCallback(relayIndex, state);
 }
@@ -255,6 +241,12 @@ void MQTTService::handleCropSelect(const char* payload)
 {
     Serial.printf("[MQTT] Crop select: %s\n", payload);
     if (cropCallback) cropCallback(payload);
+}
+
+void MQTTService::handleModeSelect(const char* payload)
+{
+    Serial.printf("[MQTT] Mode select: %s\n", payload);
+    if (modeCallback) modeCallback(payload);
 }
 
 void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int length)
@@ -268,14 +260,16 @@ void MQTTService::onMessageReceived(char* topic, byte* payload, unsigned int len
     
     Serial.printf("[MQTT] Message received on: %s = %s\n", topic, message);
 
-    // Handle relay commands
-    if (topicStr == MQTT_TOPIC_CONTROL_FAN) handleRelayCommand(0, message);
-    else if (topicStr == MQTT_TOPIC_CONTROL_HEATER) handleRelayCommand(1, message);
-    else if (topicStr == MQTT_TOPIC_CONTROL_COOLER) handleRelayCommand(2, message);
-    else if (topicStr == MQTT_TOPIC_CONTROL_HUMIDIFIER) handleRelayCommand(3, message);
-    else if (topicStr == MQTT_TOPIC_CONTROL_DEHUMIDIFIER) handleRelayCommand(4, message);
-    else if (topicStr == MQTT_TOPIC_CONTROL_IRRIGATION) handleRelayCommand(5, message);
-    else if (topicStr == MQTT_TOPIC_CROP_SELECT) handleCropSelect(message);
+    if (topicStr.startsWith(MQTT_RUNTIME_PREFIX "/relay/") && topicStr.endsWith("/set")) {
+        int relayIndex = topicStr.substring(String(MQTT_RUNTIME_PREFIX "/relay/").length(), topicStr.lastIndexOf('/')).toInt() - 1;
+        if (relayIndex >= 0 && relayIndex < NUM_RELAYS) {
+            handleRelayCommand(static_cast<uint8_t>(relayIndex), message);
+        }
+    } else if (topicStr == MQTT_TOPIC_CROP_SELECT) {
+        handleCropSelect(message);
+    } else if (topicStr == MQTT_TOPIC_MODE_SET) {
+        handleModeSelect(message);
+    }
 }
 
 void MQTTService::publishDiscoveryMessages()
@@ -299,6 +293,9 @@ void MQTTService::publishDiscoveryMessages()
         doc["unit_of_measurement"] = "°C";
         doc["device_class"] = "temperature";
         doc["icon"] = "mdi:thermometer";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
         
@@ -316,6 +313,9 @@ void MQTTService::publishDiscoveryMessages()
         doc["unit_of_measurement"] = "%";
         doc["device_class"] = "humidity";
         doc["icon"] = "mdi:water-percent";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
         
@@ -332,6 +332,9 @@ void MQTTService::publishDiscoveryMessages()
         doc["state_topic"] = MQTT_TOPIC_SOIL_MOISTURE;
         doc["unit_of_measurement"] = "%";
         doc["icon"] = "mdi:water";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
         
@@ -349,6 +352,9 @@ void MQTTService::publishDiscoveryMessages()
         doc["unit_of_measurement"] = "°C";
         doc["device_class"] = "temperature";
         doc["icon"] = "mdi:thermometer";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
         
@@ -365,6 +371,9 @@ void MQTTService::publishDiscoveryMessages()
         doc["state_topic"] = MQTT_TOPIC_PH;
         doc["unit_of_measurement"] = "pH";
         doc["icon"] = "mdi:test-tube";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
         
@@ -381,6 +390,9 @@ void MQTTService::publishDiscoveryMessages()
         doc["state_topic"] = MQTT_TOPIC_EC;
         doc["unit_of_measurement"] = "µS/cm";
         doc["icon"] = "mdi:flash";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
         
@@ -397,6 +409,9 @@ void MQTTService::publishDiscoveryMessages()
         doc["state_topic"] = MQTT_TOPIC_NITROGEN;
         doc["unit_of_measurement"] = "mg/kg";
         doc["icon"] = "mdi:leaf";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
         
@@ -413,6 +428,9 @@ void MQTTService::publishDiscoveryMessages()
         doc["state_topic"] = MQTT_TOPIC_PHOSPHORUS;
         doc["unit_of_measurement"] = "mg/kg";
         doc["icon"] = "mdi:leaf";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
         
@@ -429,6 +447,9 @@ void MQTTService::publishDiscoveryMessages()
         doc["state_topic"] = MQTT_TOPIC_POTASSIUM;
         doc["unit_of_measurement"] = "mg/kg";
         doc["icon"] = "mdi:leaf";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
         
@@ -439,22 +460,28 @@ void MQTTService::publishDiscoveryMessages()
 
     // ==================== SWITCHES (RELAYS) ====================
     
-    const char* relayNames[] = {"Fan", "Heater", "Cooler", "Humidifier", "Dehumidifier", "Irrigation"};
-    const char* relayIds[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation"};
-    const char* relayIcons[] = {"mdi:fan", "mdi:fire", "mdi:snowflake", "mdi:water-opacity", "mdi:water-opacity", "mdi:water-drop"};
-    const char* relayTopics[] = {MQTT_TOPIC_FAN, MQTT_TOPIC_HEATER, MQTT_TOPIC_COOLER, 
-                                MQTT_TOPIC_HUMIDIFIER, MQTT_TOPIC_DEHUMIDIFIER, MQTT_TOPIC_IRRIGATION};
-    const char* relayCommands[] = {MQTT_TOPIC_CONTROL_FAN, MQTT_TOPIC_CONTROL_HEATER, MQTT_TOPIC_CONTROL_COOLER,
-                                  MQTT_TOPIC_CONTROL_HUMIDIFIER, MQTT_TOPIC_CONTROL_DEHUMIDIFIER, MQTT_TOPIC_CONTROL_IRRIGATION};
+    const char* relayNames[] = {"Fan", "Heater", "Cooler", "Humidifier", "Dehumidifier", "Irrigation", "Relay 7", "Relay 8"};
+    const char* relayIds[] = {"fan", "heater", "cooler", "humidifier", "dehumidifier", "irrigation", "relay7", "relay8"};
+    const char* relayIcons[] = {"mdi:fan", "mdi:radiator", "mdi:snowflake", "mdi:water-percent", "mdi:water-off", "mdi:water-pump", "mdi:toggle-switch", "mdi:toggle-switch"};
 
-    for (uint8_t i = 0; i < 6; i++) {
+    for (uint8_t i = 0; i < NUM_RELAYS; i++) {
+        char stateTopic[64];
+        char commandTopic[64];
+        snprintf(stateTopic, sizeof(stateTopic), MQTT_RUNTIME_PREFIX "/relay/%u/state", i + 1);
+        snprintf(commandTopic, sizeof(commandTopic), MQTT_RUNTIME_PREFIX "/relay/%u/set", i + 1);
+
         StaticJsonDocument<512> doc;
         doc["name"] = relayNames[i];
         doc["unique_id"] = String("smartgarden_") + relayIds[i];
-        doc["state_topic"] = relayTopics[i];
-        doc["command_topic"] = relayCommands[i];
+        doc["state_topic"] = stateTopic;
+        doc["command_topic"] = commandTopic;
         doc["payload_on"] = "ON";
         doc["payload_off"] = "OFF";
+        doc["state_on"] = "ON";
+        doc["state_off"] = "OFF";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         doc["icon"] = relayIcons[i];
         doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
         doc["device"]["name"] = MQTT_DEVICE_NAME;
@@ -471,8 +498,11 @@ void MQTTService::publishDiscoveryMessages()
         doc["name"] = "Crop Profile";
         doc["unique_id"] = "smartgarden_crop";
         doc["command_topic"] = MQTT_TOPIC_CROP_SELECT;
-        doc["state_topic"] = (String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_crop/state");
+        doc["state_topic"] = MQTT_TOPIC_CROP_STATE;
         doc["icon"] = "mdi:leaf";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
         JsonArray options = doc.createNestedArray("options");
         options.add("Tomato");
         options.add("Lettuce");
@@ -483,6 +513,29 @@ void MQTTService::publishDiscoveryMessages()
         
         serializeJson(doc, payload);
         client->publish((String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_crop/config").c_str(), payload, true);
+    }
+    delay(50);
+
+    // ==================== OPERATION MODE ====================
+    {
+        StaticJsonDocument<512> doc;
+        doc["name"] = "Operation Mode";
+        doc["unique_id"] = "smartgarden_operation_mode";
+        doc["command_topic"] = MQTT_TOPIC_MODE_SET;
+        doc["state_topic"] = MQTT_TOPIC_MODE_STATE;
+        doc["icon"] = "mdi:cog-transfer";
+        doc["availability_topic"] = MQTT_TOPIC_AVAILABILITY;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
+        JsonArray options = doc.createNestedArray("options");
+        options.add("manual");
+        options.add("auto");
+        options.add("monitor");
+        doc["device"]["identifiers"][0] = MQTT_DEVICE_ID;
+        doc["device"]["name"] = MQTT_DEVICE_NAME;
+
+        serializeJson(doc, payload);
+        client->publish((String(HA_DISCOVERY_PREFIX) + "/select/smartgarden_operation_mode/config").c_str(), payload, true);
     }
     delay(50);
 

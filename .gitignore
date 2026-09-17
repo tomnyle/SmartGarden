@@ -1,2 +1,5 @@
 .pio/
 .vscode/
+*.log
+secrets.h
+include/secrets.h

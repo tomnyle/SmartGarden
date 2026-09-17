@@ -10,6 +10,7 @@
 
 typedef void (*RelayCommandCallback)(uint8_t relayIndex, bool state);
 typedef void (*CropSelectCallback)(const char* cropName);
+typedef void (*ModeSelectCallback)(const char* modeName);
 
 class MQTTService {
 public:
@@ -26,6 +27,7 @@ public:
     // Callback setters
     void setRelayCommandCallback(RelayCommandCallback callback);
     void setCropSelectCallback(CropSelectCallback callback);
+    void setModeSelectCallback(ModeSelectCallback callback);
     
     // Publishing functions
     bool publish(const char* topic, const char* payload);
@@ -58,6 +60,7 @@ private:
     // Callbacks
     RelayCommandCallback relayCallback;
     CropSelectCallback cropCallback;
+    ModeSelectCallback modeCallback;
     
     // Callback for received messages
     void onMessageReceived(char* topic, byte* payload, unsigned int length);
@@ -65,8 +68,9 @@ private:
     
     // Helper functions
     void subscribeToTopics();
-    void handleRelayCommand(const char* relayName, const char* payload);
+    void handleRelayCommand(uint8_t relayIndex, const char* payload);
     void handleCropSelect(const char* payload);
+    void handleModeSelect(const char* payload);
 };
 
 #endif // MQTT_SERVICE_H
