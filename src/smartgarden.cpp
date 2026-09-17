@@ -40,6 +40,7 @@ static const char* relayIds[NUM_RELAYS] = {
 static const CropProfile* currentCrop = nullptr;
 
 static unsigned long lastSensorRead = 0;
+static unsigned long lastMqttConnectAttempt = 0;
 
 static uint16_t modbusCRC16(const uint8_t* data, size_t length)
 {
@@ -461,23 +462,36 @@ static void callback(char* topic, byte* payload, unsigned int length)
     }
 }
 
-static void reconnect()
+static bool reconnect()
 {
-    while (!client.connected()) {
-        if (client.connect(deviceId, MQTT_USERNAME, MQTT_PASSWORD, MQTT_TOPIC_AVAILABILITY, 0, true, "offline")) {
-            client.publish(MQTT_TOPIC_AVAILABILITY, "online", true);
-            subscribeTopics();
-            publishDiscoveryMessages();
-            publishMode();
-            publishCropState();
-            publishCropList();
-            for (uint8_t i = 0; i < NUM_RELAYS; i++) {
-                publishRelayState(i);
-            }
-        } else {
-            delay(3000);
-        }
+    if (client.connected()) {
+        return true;
     }
+
+    if (WiFi.status() != WL_CONNECTED) {
+        return false;
+    }
+
+    unsigned long now = millis();
+    if (now - lastMqttConnectAttempt < MQTT_RECONNECT_INTERVAL) {
+        return false;
+    }
+    lastMqttConnectAttempt = now;
+
+    if (client.connect(deviceId, MQTT_USERNAME, MQTT_PASSWORD, MQTT_TOPIC_AVAILABILITY, 0, true, "offline")) {
+        client.publish(MQTT_TOPIC_AVAILABILITY, "online", true);
+        subscribeTopics();
+        publishDiscoveryMessages();
+        publishMode();
+        publishCropState();
+        publishCropList();
+        for (uint8_t i = 0; i < NUM_RELAYS; i++) {
+            publishRelayState(i);
+        }
+        return true;
+    }
+
+    return false;
 }
 
 void setup()
