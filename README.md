@@ -171,7 +171,7 @@ mosquitto_sub -h 192.168.1.100 -t "smartgarden/crop/config"
 
 ## 🔌 Kế Nối Phần Cứng
 
-Giá trị mặc định lấy trực tiếp từ `include/pins.h`:
+Giá trị dưới đây khớp trực tiếp với `include/pins.h` hiện tại:
 
 ```cpp
 #define DHT_PIN 4

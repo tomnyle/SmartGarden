@@ -57,9 +57,13 @@ static const char* relayCommandTopicByIndex(int relayIndex) {
     }
 }
 
-static void publishDiscoveryMessage(const char* topic, const char* payload) {
-    client.publish(topic, payload, true);
+static bool publishDiscoveryMessage(const char* topic, const char* payload) {
+    bool ok = client.publish(topic, payload, true);
+    if (!ok) {
+        Serial.printf("[MQTT] Discovery publish failed: %s\n", topic);
+    }
     delay(20);
+    return ok;
 }
 
 void setRelay(int index, bool state) {
@@ -218,19 +222,33 @@ static void ensureMqttConnected() {
         Serial.println("[MQTT] Connected");
         mqttBackoffMs = 2000;
 
-        client.publish(MQTT_TOPIC_STATUS, "online", true);
-        client.publish(MQTT_TOPIC_CROP_LIST, "ginseng,salvia,morinda,lettuce,microgreens,tomato,strawberry,cucumber,chili,eggplant,carrot,onion,broccoli", true);
-        client.publish(MQTT_TOPIC_CROP_SELECT_STATE, currentCrop.c_str(), true);
-        client.publish(MQTT_TOPIC_DIAG_RSSI, String(WiFi.RSSI()).c_str(), true);
+        bool setupOk = true;
+        setupOk &= client.publish(MQTT_TOPIC_STATUS, "online", true);
+        setupOk &= client.publish(MQTT_TOPIC_CROP_LIST, "ginseng,salvia,morinda,lettuce,microgreens,tomato,strawberry,cucumber,chili,eggplant,carrot,onion,broccoli", true);
+        setupOk &= client.publish(MQTT_TOPIC_CROP_SELECT_STATE, currentCrop.c_str(), true);
+        setupOk &= client.publish(MQTT_TOPIC_DIAG_RSSI, String(WiFi.RSSI()).c_str(), true);
 
         for (int i = 0; i < RELAY_COUNT; i++) {
             const char* cmdTopic = relayCommandTopicByIndex(i);
-            if (cmdTopic) client.subscribe(cmdTopic);
+            if (cmdTopic) {
+                bool subOk = client.subscribe(cmdTopic);
+                setupOk &= subOk;
+                if (!subOk) {
+                    Serial.printf("[MQTT] SUB failed: %s\n", cmdTopic);
+                }
+            }
         }
-        client.subscribe(MQTT_TOPIC_CROP_SELECT_COMMAND);
+        bool cropSubOk = client.subscribe(MQTT_TOPIC_CROP_SELECT_COMMAND);
+        setupOk &= cropSubOk;
+        if (!cropSubOk) {
+            Serial.printf("[MQTT] SUB failed: %s\n", MQTT_TOPIC_CROP_SELECT_COMMAND);
+        }
 
         publishDiscoveryMessages();
         publishRelayStates();
+        if (!setupOk) {
+            Serial.println("[MQTT] Warning: one or more publish/subscribe operations failed after reconnect");
+        }
     } else {
         Serial.printf("[MQTT] Connect failed (code=%d)\n", client.state());
         mqttBackoffMs = (mqttBackoffMs < MQTT_BACKOFF_MAX_MS / 2) ? mqttBackoffMs * 2 : MQTT_BACKOFF_MAX_MS;
