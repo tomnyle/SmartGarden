@@ -182,21 +182,27 @@ static void readRS485Sensors()
 
     uint8_t request[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x08, 0x44, 0x09};
 
+    while (Serial2.available() > 0) {
+        Serial2.read();
+    }
+
     digitalWrite(RS485_DE, HIGH);
     delay(10);
     Serial2.write(request, sizeof(request));
     Serial2.flush();
     digitalWrite(RS485_DE, LOW);
 
-    delay(100);
-
-    if (!Serial2.available()) {
+    unsigned long waitStart = millis();
+    while (Serial2.available() < 3 && (millis() - waitStart) < RS485_READ_TIMEOUT) {
+        delay(1);
+    }
+    if (Serial2.available() < 3) {
         return;
     }
 
     uint8_t response[32];
-    int bytesRead = Serial2.readBytes(response, sizeof(response));
-    if (bytesRead < 19) {
+    size_t headerRead = Serial2.readBytes(response, 3);
+    if (headerRead != 3) {
         return;
     }
 
@@ -206,7 +212,13 @@ static void readRS485Sensors()
 
     uint8_t payloadBytes = response[2];
     uint8_t expectedLength = payloadBytes + 5;
-    if (payloadBytes < 14 || expectedLength > bytesRead) {
+    if (payloadBytes < 14 || expectedLength > sizeof(response)) {
+        return;
+    }
+
+    size_t remainingLength = expectedLength - 3;
+    size_t bodyRead = Serial2.readBytes(response + 3, remainingLength);
+    if (bodyRead != remainingLength) {
         return;
     }
 
@@ -242,7 +254,7 @@ static void applyAutoControl()
         return;
     }
 
-    setRelay(0, airTemp > currentCrop->temperature.max);      // fan
+    setRelay(0, airTemp > currentCrop->temperature.max || airHum > currentCrop->airHumidity.max); // fan
     setRelay(1, airTemp < currentCrop->temperature.min);      // heater
     setRelay(2, airTemp > currentCrop->temperature.max);      // cooler
     setRelay(3, airHum < currentCrop->airHumidity.min);       // humidifier

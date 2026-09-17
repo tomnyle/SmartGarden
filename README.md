@@ -73,7 +73,7 @@ Cấu hình tập trung tại:
 - `include/app_config.h` (Wi-Fi, MQTT, topic, interval)
 - `include/pins.h` (toàn bộ pin)
 
-Khuyến nghị: chuyển credential thật sang `include/secrets.h` (file local, không commit).
+Khuyến nghị: chuyển credential thật sang **`/home/runner/work/SmartGarden/SmartGarden/include/secrets.h`** (file local, không commit). `app_config.h` sẽ tự include file `secrets.h` nếu tồn tại trong thư mục include.
 Ví dụ `include/secrets.h`:
 ```cpp
 #define WIFI_SSID "your-ssid"
