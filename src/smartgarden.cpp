@@ -526,6 +526,7 @@ void setup()
     dht.begin();
 
     Serial2.begin(RS485_BAUD_RATE, SERIAL_8N1, RS485_RX, RS485_TX);
+    Serial2.setTimeout(RS485_READ_TIMEOUT);
     pinMode(RS485_DE, OUTPUT);
     digitalWrite(RS485_DE, LOW);
 

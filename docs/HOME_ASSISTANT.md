@@ -13,6 +13,11 @@ SmartGarden sẽ publish config vào:
 - `homeassistant/switch/.../config`
 - `homeassistant/select/.../config`
 
+Về danh sách crop:
+- Firmware publish thêm runtime topic `smartgarden/crop/list` (JSON options).
+- MQTT Discovery `select` của Home Assistant lấy options tại thời điểm publish discovery.
+- Nếu crop catalog thay đổi, cần publish lại discovery (hoặc reboot/reconnect thiết bị) để HA cập nhật options.
+
 ## 3. Entity được tạo
 - Sensor: air_temp, air_humidity, soil_moisture, soil_temp, ph, ec, nitrogen, phosphorus, potassium.
 - Switch: 8 relay.
