@@ -43,7 +43,12 @@ const char* const RELAY_ICONS[RELAY_COUNT] = {
 struct AirState {
     float temperature = 0.0f;
     float humidity = 0.0f;
-    bool valid = false;
+    bool temperatureValid = false;
+    bool humidityValid = false;
+
+    bool valid() const {
+        return temperatureValid && humidityValid;
+    }
 };
 
 struct SoilState {
@@ -147,15 +152,6 @@ void publishInt(const char* topic, int32_t value) {
     publishRetained(topic, payload);
 }
 
-const char* jsonStringOrNull(const char* value, char* buffer, size_t bufferSize) {
-    if (value == nullptr) {
-        strlcpy(buffer, "null", bufferSize);
-    } else {
-        snprintf(buffer, bufferSize, "\"%s\"", value);
-    }
-    return buffer;
-}
-
 void publishRelayState(uint8_t relayIndex) {
     char topic[48];
     buildRelayStateTopic(relayIndex, topic, sizeof(topic));
@@ -216,7 +212,7 @@ void publishCropList() {
 }
 
 void publishAirStateIfValid() {
-    if (!lastAirState.valid) {
+    if (!lastAirState.valid()) {
         return;
     }
 
@@ -478,6 +474,7 @@ bool readAirSensor() {
 
     if (!isnan(temperature)) {
         lastAirState.temperature = temperature;
+        lastAirState.temperatureValid = true;
         updated = true;
     } else {
         Serial.println("[DHT] Temperature read failed, keeping last valid value");
@@ -485,16 +482,13 @@ bool readAirSensor() {
 
     if (!isnan(humidity)) {
         lastAirState.humidity = humidity;
+        lastAirState.humidityValid = true;
         updated = true;
     } else {
         Serial.println("[DHT] Humidity read failed, keeping last valid value");
     }
 
-    if (!isnan(temperature) && !isnan(humidity)) {
-        lastAirState.valid = true;
-    }
-
-    return updated && lastAirState.valid;
+    return updated && lastAirState.valid();
 }
 
 bool readSoilSensor() {
@@ -531,7 +525,7 @@ bool readSoilSensor() {
 
 void printSensorSummary() {
     Serial.println("\n========== SENSOR DATA ==========");
-    if (lastAirState.valid) {
+    if (lastAirState.valid()) {
         Serial.printf("Air Temp     : %.1f C\n", lastAirState.temperature);
         Serial.printf("Air Humidity : %.1f %%\n", lastAirState.humidity);
     } else {
@@ -570,7 +564,7 @@ void applyAutoControl() {
 
     Serial.printf("[Auto] Evaluating crop '%s'\n", currentCrop->name);
 
-    if (lastAirState.valid) {
+    if (lastAirState.valid()) {
         bool heaterOn = lastAirState.temperature < currentCrop->temperature.min;
         bool coolerOn = lastAirState.temperature > currentCrop->temperature.max;
         bool fanOn = coolerOn;
