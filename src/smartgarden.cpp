@@ -568,7 +568,7 @@ void printSensorSummary() {
     Serial.println("=================================");
 }
 
-void applyAutoControl() {
+void applyAutoControl(bool hasFreshSoilData) {
     if (currentMode != OperationMode::AUTO || currentCrop == nullptr) {
         return;
     }
@@ -589,7 +589,7 @@ void applyAutoControl() {
         setRelay(CLIMATE_DEHUMIDIFIER_RELAY_INDEX, dehumidifierOn);
     }
 
-    if (lastSoilState.valid) {
+    if (hasFreshSoilData && lastSoilState.valid) {
         bool irrigationOn = lastSoilState.moisture < currentCrop->soilHumidity.min;
         setRelay(IRRIGATION_RELAY_INDEX, irrigationOn);
     }
@@ -622,7 +622,7 @@ void handleModeSelection(const char* payload) {
     if (currentMode == OperationMode::MONITOR) {
         setAllRelaysOff();
     } else if (currentMode == OperationMode::AUTO) {
-        applyAutoControl();
+        applyAutoControl(false);
     }
 
     if (mqttClient.connected()) {
@@ -678,7 +678,10 @@ void setup() {
     Serial.begin(115200);
     delay(2000);
 
-    snprintf(mqttClientId, sizeof(mqttClientId), "smartgarden_%llX", static_cast<unsigned long long>(ESP.getEfuseMac()));
+    const uint64_t efuseMac = ESP.getEfuseMac();
+    const unsigned long macHigh = static_cast<unsigned long>(efuseMac >> 32);
+    const unsigned long macLow = static_cast<unsigned long>(efuseMac & 0xFFFFFFFFULL);
+    snprintf(mqttClientId, sizeof(mqttClientId), "smartgarden_%08lX%08lX", macHigh, macLow);
 
     Serial.println("\n========== SmartGarden Startup ==========");
     CropProfileStore::initialize();
@@ -737,12 +740,12 @@ void loop() {
 
         if (mqttClient.connected()) {
             publishAirStateIfValid();
-            if (soilReadOk || lastSoilState.valid) {
+            if (soilReadOk) {
                 publishSoilStateIfValid();
             }
         }
 
-        applyAutoControl();
+        applyAutoControl(soilReadOk);
         printSensorSummary();
     }
 
